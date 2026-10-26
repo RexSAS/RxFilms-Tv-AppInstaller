@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="intro">Installs RxFilms on your TV in place of Jellyfin. On the TV, turn on Developer options → ADB debugging, and keep this phone on the same Wi-Fi.</string>
+    <string name="scan">Search for TVs</string>
+    <string name="scanning">Searching for TVs…</string>
+    <string name="none_found">No TV found. Check that ADB debugging is on, or type the TV\'s IP address below.</string>
+    <string name="install_on">Install RxFilms on %1$s</string>
+    <string name="manual_hint">TV IP address (e.g. 192.168.1.49)</string>
+    <string name="install_manual">Install on this IP</string>
+    <string name="downloading">Downloading the latest RxFilms…</string>
+    <string name="connecting">Connecting to %1$s. If the TV asks to allow debugging, choose Always allow.</string>
+    <string name="replacing">Removing the original Jellyfin app (its login will be lost)…</string>
+    <string name="done">Done: RxFilms is installed and opening on the TV.</string>
+    <string name="failed">Failed: %1$s</string>
+    <string name="no_asset">The latest release (%1$s) has no TV APK.</string>
+</resources>

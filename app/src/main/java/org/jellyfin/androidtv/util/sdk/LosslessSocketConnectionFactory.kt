@@ -31,7 +31,7 @@ class LosslessSocketConnectionFactory(private val factory: OkHttpFactory) : Sock
 }
 
 private class LosslessSocketConnection(private val client: OkHttpClient) : SocketConnection {
-	private var webSocket: WebSocket? = null
+	@Volatile private var webSocket: WebSocket? = null
 	private val mutableState = BufferedSocketState(SocketConnectionState.Disconnected())
 	override val state: StateFlow<SocketConnectionState> = mutableState
 
@@ -40,15 +40,16 @@ private class LosslessSocketConnection(private val client: OkHttpClient) : Socke
 			mutableState.update(SocketConnectionState.Message(text))
 		}
 
+		// A null field also matches: OkHttp may fail before newWebSocket() returns, and connect() would wait forever.
 		override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-			if (this@LosslessSocketConnection.webSocket == webSocket) {
+			if (this@LosslessSocketConnection.webSocket.let { it == null || it == webSocket }) {
 				this@LosslessSocketConnection.webSocket = null
 				mutableState.update(SocketConnectionState.Disconnected())
 			}
 		}
 
 		override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-			if (this@LosslessSocketConnection.webSocket == webSocket) {
+			if (this@LosslessSocketConnection.webSocket.let { it == null || it == webSocket }) {
 				this@LosslessSocketConnection.webSocket = null
 				mutableState.update(SocketConnectionState.Disconnected(t))
 			}

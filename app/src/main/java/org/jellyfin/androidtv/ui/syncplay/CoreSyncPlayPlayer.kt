@@ -7,8 +7,11 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.ui.navigation.Destinations
+import org.jellyfin.androidtv.ui.navigation.NavigationAction
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.ui.playback.VideoQueueManager
+import org.jellyfin.androidtv.ui.playback.rewrite.RewriteMediaManager
+import org.jellyfin.androidtv.ui.player.video.VideoPlayerFragment
 import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.playback.core.backend.PlayerBackendEventListener
 import org.jellyfin.playback.core.model.PlayState
@@ -76,10 +79,15 @@ class CoreSyncPlayPlayer(
 		ready = CompletableDeferred()
 		videoQueueManager.setCurrentVideoQueue(listOf(baseItem))
 		videoQueueManager.setCurrentMediaPosition(0)
-		navigationRepository.navigate(
-			Destinations.videoPlayerNew((positionTicks / TICKS_PER_MILLISECOND).toInt()),
-			replace = true,
-		)
+		val playerShown = (navigationRepository.currentAction.replayCache.lastOrNull() as? NavigationAction.NavigateFragment)
+			?.destination?.fragment == VideoPlayerFragment::class
+		if (playerShown) {
+			// Replacing the fragment would pause (halt) and stop the outgoing player after the new queue loads.
+			playbackManager.queue.clear()
+			playbackManager.queue.addSupplier(RewriteMediaManager.BaseItemQueueSupplier(api, listOf(baseItem), false))
+		} else {
+			navigationRepository.navigate(Destinations.videoPlayerNew((positionTicks / TICKS_PER_MILLISECOND).toInt()))
+		}
 		ready.await()
 		playbackManager.state.pause()
 		seek(positionTicks)

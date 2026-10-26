@@ -1,5 +1,7 @@
 package org.jellyfin.androidtv.ui.search
 
+import kotlinx.coroutines.flow.combine
+
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.ViewGroup
@@ -64,8 +66,8 @@ class SearchFragment : Fragment() {
 				textInputFocusRequester.requestFocus()
 			}
 
-			viewModel.searchResultsFlow.collect { results ->
-				searchFragmentDelegate.showResults(results)
+			combine(viewModel.searchResultsFlow, viewModel.seerrResultsFlow, ::Pair).collect { (results, seerr) ->
+				searchFragmentDelegate.showResults(results, seerr)
 			}
 		}
 

@@ -1,5 +1,9 @@
 package org.jellyfin.androidtv.ui.search
 
+import org.jellyfin.androidtv.ui.seerr.Seerr
+import org.jellyfin.androidtv.ui.seerr.SeerrTitle
+import timber.log.Timber
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Job
@@ -45,6 +49,9 @@ class SearchViewModel(
 	private val _searchResultsFlow = MutableStateFlow<Collection<SearchResultGroup>>(emptyList())
 	val searchResultsFlow = _searchResultsFlow.asStateFlow()
 
+	private val _seerrResultsFlow = MutableStateFlow<List<SeerrTitle>>(emptyList())
+	val seerrResultsFlow = _seerrResultsFlow.asStateFlow()
+
 	fun searchImmediately(query: String) = searchDebounced(query, 0.milliseconds)
 
 	fun searchDebounced(query: String, debounce: Duration = debounceDuration): Boolean {
@@ -56,11 +63,18 @@ class SearchViewModel(
 
 		if (trimmed.isBlank()) {
 			_searchResultsFlow.value = emptyList()
+			_seerrResultsFlow.value = emptyList()
 			return true
 		}
 
 		searchJob = viewModelScope.launch {
 			delay(debounce)
+
+			launch {
+				_seerrResultsFlow.value = runCatching { Seerr.search(trimmed) }
+					.onFailure { Timber.w(it, "Seerr search failed") }
+					.getOrDefault(emptyList())
+			}
 
 			_searchResultsFlow.value = groups.map { (stringRes, itemKinds) ->
 				async {

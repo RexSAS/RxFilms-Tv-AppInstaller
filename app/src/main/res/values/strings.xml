@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
-    <string name="app_name_release" translatable="false" tools:ignore="UnusedResources">Jellyfin</string>
-    <string name="app_name_debug" translatable="false" tools:ignore="UnusedResources">Jellyfin Debug</string>
+    <string name="app_name_release" translatable="false" tools:ignore="UnusedResources">RxFilms</string>
+    <string name="app_name_debug" translatable="false" tools:ignore="UnusedResources">RxFilms</string>
     <string name="video_error_unknown_error">Failed to load video</string>
     <string name="loading">Loading…</string>
     <string name="btn_cancel">Cancel</string>
@@ -377,7 +377,7 @@
     <string name="no_network_permissions">Jellyfin requires network permissions to function</string>
     <string name="press_to_close">Press to close</string>
     <string name="saved_servers">Saved servers</string>
-    <string name="welcome_title">Welcome to Jellyfin!</string>
+    <string name="welcome_title">Welcome to RxFilms!</string>
     <string name="welcome_content">Connect to your server to get started.</string>
     <string name="no_user_warning">We couldn\'t find any accounts!\nAdd a new account by pressing the \"Add account\" button.</string>
     <string name="who_is_watching">Who\'s watching?</string>
@@ -430,6 +430,23 @@
     <string name="home_section_next_up">Next up</string>
     <string name="home_section_livetv">Live TV</string>
     <string name="home_section_none">None</string>
+    <string name="home_section_media_bar">Media bar (featured titles)</string>
+    <string name="home_section_seerr_recommended">Downloadable recommendations</string>
+    <string name="home_seerr_movies">Downloadable Movies</string>
+    <string name="home_seerr_series">Downloadable Series</string>
+    <string name="seerr_search_results">Downloadable</string>
+    <string name="seerr_request_title">Request %1$s?</string>
+    <string name="seerr_request_message">It will be added to your server when it is available.</string>
+    <string name="seerr_request_confirm">Request</string>
+    <string name="seerr_request_done">Requested</string>
+    <string name="seerr_request_failed">Request failed</string>
+    <string name="home_section_top_10">Top 10 (trending)</string>
+    <string name="home_section_because_you_watched">Because you watched</string>
+    <string name="home_section_genres">Genres</string>
+    <string name="home_section_franchises">Franchises</string>
+    <string name="lbl_more_information">More info</string>
+    <string name="home_top_10_movies">Top 10 Movies</string>
+    <string name="home_top_10_series">Top 10 Series</string>
     <string name="home_section_i">Home section %1$d</string>
     <string name="searchable_hint">Search Jellyfin</string>
     <string name="searchable_settings_description">Media</string>

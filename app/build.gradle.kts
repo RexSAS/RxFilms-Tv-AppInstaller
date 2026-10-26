@@ -17,6 +17,10 @@ android {
 		applicationId = namespace
 		versionName = project.getVersionName()
 		versionCode = getVersionCode(versionName!!)
+
+		// Seerr server for the Downloadable rows; set in ~/.gradle/gradle.properties so the key is not in the repo.
+		buildConfigField("String", "SEERR_URL", "\"${getProperty("rxfilms.seerr.url").orEmpty()}\"")
+		buildConfigField("String", "SEERR_API_KEY", "\"${getProperty("rxfilms.seerr.key").orEmpty()}\"")
 	}
 
 	buildFeatures {

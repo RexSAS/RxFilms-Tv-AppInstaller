@@ -17,16 +17,16 @@ class UserSettingPreferences(
 		val skipBackLength = intPreference("skipBackLength", 10_000)
 		val skipForwardLength = intPreference("skipForwardLength", 30_000)
 
-		val homesection0 = enumPreference("homesection0", HomeSectionType.LIBRARY_TILES_SMALL)
+		val homesection0 = enumPreference("homesection0", HomeSectionType.MEDIA_BAR)
 		val homesection1 = enumPreference("homesection1", HomeSectionType.RESUME)
-		val homesection2 = enumPreference("homesection2", HomeSectionType.RESUME_AUDIO)
-		val homesection3 = enumPreference("homesection3", HomeSectionType.RESUME_BOOK)
-		val homesection4 = enumPreference("homesection4", HomeSectionType.LIVE_TV)
-		val homesection5 = enumPreference("homesection5", HomeSectionType.NEXT_UP)
+		val homesection2 = enumPreference("homesection2", HomeSectionType.NEXT_UP)
+		val homesection3 = enumPreference("homesection3", HomeSectionType.TOP_10)
+		val homesection4 = enumPreference("homesection4", HomeSectionType.SEERR_RECOMMENDED)
+		val homesection5 = enumPreference("homesection5", HomeSectionType.BECAUSE_YOU_WATCHED)
 		val homesection6 = enumPreference("homesection6", HomeSectionType.LATEST_MEDIA)
-		val homesection7 = enumPreference("homesection7", HomeSectionType.NONE)
-		val homesection8 = enumPreference("homesection8", HomeSectionType.NONE)
-		val homesection9 = enumPreference("homesection9", HomeSectionType.NONE)
+		val homesection7 = enumPreference("homesection7", HomeSectionType.FRANCHISES)
+		val homesection8 = enumPreference("homesection8", HomeSectionType.GENRES)
+		val homesection9 = enumPreference("homesection9", HomeSectionType.LIVE_TV)
 	}
 
 	val homesections = listOf(

@@ -21,5 +21,11 @@ enum class HomeSectionType(
 	ACTIVE_RECORDINGS("activerecordings", R.string.home_section_active_recordings),
 	NEXT_UP("nextup", R.string.home_section_next_up),
 	LIVE_TV("livetv", R.string.home_section_livetv),
+	MEDIA_BAR("rxmediabar", R.string.home_section_media_bar),
+	TOP_10("rxtop10", R.string.home_section_top_10),
+	SEERR_RECOMMENDED("rxseerrrecommended", R.string.home_section_seerr_recommended),
+	BECAUSE_YOU_WATCHED("rxbecauseyouwatched", R.string.home_section_because_you_watched),
+	GENRES("rxgenres", R.string.home_section_genres),
+	FRANCHISES("rxfranchises", R.string.home_section_franchises),
 	NONE("none", R.string.home_section_none),
 }

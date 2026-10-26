@@ -13,6 +13,8 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.serviceLoaderEnabled
 import coil3.svg.SvgDecoder
 import coil3.util.Logger
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.BuildConfig
 import org.jellyfin.androidtv.auth.repository.ServerRepository
 import org.jellyfin.androidtv.auth.repository.SessionCleanup
@@ -133,12 +135,15 @@ val appModule = module {
 		}
 	} bind SyncPlayClient::class
 	single<SessionCleanup> {
+		// Session changes run on IO; the coordinator and ExoPlayer must only be touched on Main.
 		SessionCleanup {
-			val syncPlay = get<SyncPlayClient>()
-			try {
-				syncPlay.leave()
-			} finally {
-				syncPlay.close()
+			withContext(Dispatchers.Main.immediate) {
+				val syncPlay = get<SyncPlayClient>()
+				try {
+					syncPlay.leave()
+				} finally {
+					syncPlay.close()
+				}
 			}
 		}
 	}
@@ -212,5 +217,5 @@ val appModule = module {
 	single { ReportingHelper(get(), get()) }
 	single<PlaybackHelper> { SdkPlaybackHelper(get(), get(), get(), get()) }
 
-	factory { (context: Context) -> SearchFragmentDelegate(context, get(), get()) }
+	factory { (context: Context) -> SearchFragmentDelegate(context, get(), get(), get()) }
 }

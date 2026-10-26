@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
 import androidx.leanback.app.RowsSupportFragment
+import androidx.leanback.widget.ClassPresenterSelector
 import androidx.leanback.widget.ListRow
 import androidx.leanback.widget.OnItemViewClickedListener
 import androidx.leanback.widget.OnItemViewSelectedListener
@@ -24,6 +25,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.constant.CustomMessage
 import org.jellyfin.androidtv.constant.HomeSectionType
@@ -49,7 +51,10 @@ import org.jellyfin.androidtv.ui.playback.MediaManager
 import org.jellyfin.androidtv.ui.presentation.CardPresenter
 import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter
 import org.jellyfin.androidtv.ui.presentation.PositionableListRowPresenter
+import org.jellyfin.androidtv.ui.seerr.Seerr
+import org.jellyfin.androidtv.ui.seerr.SeerrTitle
 import org.jellyfin.androidtv.util.KeyProcessor
+import org.jellyfin.androidtv.util.dp
 import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.sockets.subscribe
@@ -58,6 +63,8 @@ import org.jellyfin.sdk.model.api.UserDataChangedMessage
 import org.koin.android.ext.android.inject
 import timber.log.Timber
 import kotlin.time.Duration.Companion.seconds
+
+private const val TOOLBAR_HEIGHT_DP = 95
 
 class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyListener {
 	private val api by inject<ApiClient>()
@@ -74,7 +81,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private val itemLauncher by inject<ItemLauncher>()
 	private val keyProcessor by inject<KeyProcessor>()
 
-	private val helper by lazy { HomeFragmentHelper(requireContext(), userRepository) }
+	private val helper by lazy { HomeFragmentHelper(requireContext(), userRepository, api) }
 
 	// Data
 	private var currentItem: BaseRowItem? = null
@@ -84,11 +91,20 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	// Special rows
 	private val notificationsRow by lazy { NotificationsHomeFragmentRow(lifecycleScope, notificationsRepository) }
 	private val nowPlaying by lazy { HomeFragmentNowPlayingRow(lifecycleScope, playbackManager, mediaManager) }
+	private val franchisesRow by lazy { HomeFragmentFranchisesRow(lifecycleScope, api) }
+	private val mediaBarRow by lazy { HomeFragmentMediaBarRow(lifecycleScope, api, navigationRepository) { onFocusToolbar() } }
+
+	/** Set by HomeFragment; moves focus to the toolbar drawn over these rows. */
+	var onFocusToolbar: () -> Unit = {}
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
 
-		adapter = MutableObjectAdapter<Row>(PositionableListRowPresenter())
+		adapter = MutableObjectAdapter<Row>(
+			ClassPresenterSelector()
+				.addClassPresenter(ListRow::class.java, PositionableListRowPresenter())
+				.addClassPresenter(MediaBarRow::class.java, HomeFragmentMediaBarRow.rowPresenter)
+		)
 
 		lifecycleScope.launch(Dispatchers.IO) {
 			val currentUser = withTimeout(30.seconds) {
@@ -119,6 +135,19 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 					rows.add(helper.loadOnNow())
 				}
 
+				HomeSectionType.MEDIA_BAR -> rows.add(mediaBarRow)
+				HomeSectionType.TOP_10 -> {
+					rows.add(HomeFragmentSeerrRow(lifecycleScope, getString(R.string.home_top_10_movies)) { Seerr.trending(movies = true) })
+					rows.add(HomeFragmentSeerrRow(lifecycleScope, getString(R.string.home_top_10_series)) { Seerr.trending(movies = false) })
+				}
+				HomeSectionType.SEERR_RECOMMENDED -> {
+					rows.add(HomeFragmentSeerrRow(lifecycleScope, getString(R.string.home_seerr_movies), Seerr::discoverMovies))
+					rows.add(HomeFragmentSeerrRow(lifecycleScope, getString(R.string.home_seerr_series), Seerr::discoverSeries))
+				}
+				HomeSectionType.BECAUSE_YOU_WATCHED -> rows.addAll(loadOptional { helper.loadBecauseYouWatched() })
+				HomeSectionType.GENRES -> rows.addAll(loadOptional { helper.loadGenres() })
+				HomeSectionType.FRANCHISES -> rows.add(franchisesRow)
+
 				HomeSectionType.NONE -> Unit
 			}
 
@@ -148,6 +177,8 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		onItemViewClickedListener = CompositeClickedListener().apply {
 			registerListener(ItemViewClickedListener())
 			registerListener(notificationsRow::onItemClicked)
+			registerListener(franchisesRow::onItemClicked)
+			registerListener(mediaBarRow::onItemClicked)
 		}
 
 		onItemViewSelectedListener = CompositeSelectedListener().apply {
@@ -179,6 +210,21 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		mediaManager.addAudioEventListener(this)
 	}
 
+	// A section that fails to load is left out instead of breaking the whole home screen.
+	private suspend fun loadOptional(load: suspend () -> List<HomeFragmentRow>) =
+		runCatching { load() }.onFailure { Timber.w(it, "Unable to load home section") }.getOrDefault(emptyList())
+
+	override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+		super.onViewCreated(view, savedInstanceState)
+
+		// HomeFragment draws the toolbar over these rows; keep focused rows below it. The first row
+		// (the media bar) still starts at the very top because leanback aligns it to the top edge.
+		verticalGridView?.let { grid ->
+			grid.windowAlignmentOffset += TOOLBAR_HEIGHT_DP.dp(requireContext())
+			grid.setPadding(grid.paddingLeft, 0, grid.paddingRight, grid.paddingBottom)
+		}
+	}
+
 	override fun onKey(v: View?, keyCode: Int, event: KeyEvent?): Boolean {
 		if (event?.action != KeyEvent.ACTION_UP) return false
 		return keyProcessor.handleKey(keyCode, currentItem, activity)
@@ -186,6 +232,9 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 	override fun onResume() {
 		super.onResume()
+
+		// Coming back from a details screen keeps its backdrop; the first row (media bar) uses the default background.
+		if (selectedPosition <= 0) backgroundService.clearBackgrounds()
 
 		//React to deletion
 		if (currentRow != null && currentItem != null && currentItem?.baseItem != null && currentItem!!.baseItem!!.id == dataRefreshService.lastDeletedItemId) {
@@ -247,6 +296,10 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			rowViewHolder: RowPresenter.ViewHolder?,
 			row: Row?,
 		) {
+			if (item is SeerrTitle) navigationRepository.navigate(
+				item.availableItemId?.let(Destinations::itemDetails) ?: Destinations.search(item.title)
+			)
+
 			if (item is GridButton) {
 				when (item.id) {
 					LiveTvOption.LIVE_TV_GUIDE_OPTION_ID -> navigationRepository.navigate(Destinations.liveTvGuide)

@@ -4,6 +4,7 @@ rootProject.name = "jellyfin-androidtv"
 
 // Application
 include(":app")
+include(":installer")
 
 // Modules
 include(":design")

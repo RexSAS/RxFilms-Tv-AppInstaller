@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.filterNotNull
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.auth.repository.SessionRepository
 import org.jellyfin.androidtv.auth.repository.UserRepository
+import org.jellyfin.androidtv.data.repository.UserViewsRepository
 import org.jellyfin.androidtv.ui.NowPlayingComposable
 import org.jellyfin.androidtv.ui.base.Icon
 import org.jellyfin.androidtv.ui.base.JellyfinTheme
@@ -34,6 +35,7 @@ import org.jellyfin.androidtv.ui.base.button.Button
 import org.jellyfin.androidtv.ui.base.button.ButtonDefaults
 import org.jellyfin.androidtv.ui.base.button.IconButton
 import org.jellyfin.androidtv.ui.base.button.IconButtonDefaults
+import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher
 import org.jellyfin.androidtv.ui.navigation.ActivityDestinations
 import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
@@ -58,6 +60,7 @@ enum class MainToolbarActiveButton {
 @Composable
 fun MainToolbar(
 	activeButton: MainToolbarActiveButton = MainToolbarActiveButton.None,
+	homeFocusRequester: FocusRequester? = null,
 ) {
 	val userRepository = koinInject<UserRepository>()
 	val api = koinInject<ApiClient>()
@@ -71,6 +74,7 @@ fun MainToolbar(
 		syncPlayAvailable = currentUser?.policy?.syncPlayAccess != null &&
 			currentUser?.policy?.syncPlayAccess != SyncPlayUserAccessType.NONE,
 		activeButton = activeButton,
+		homeFocusRequester = homeFocusRequester,
 	)
 }
 
@@ -79,6 +83,7 @@ private fun MainToolbar(
 	userImage: String? = null,
 	syncPlayAvailable: Boolean,
 	activeButton: MainToolbarActiveButton,
+	homeFocusRequester: FocusRequester?,
 ) {
 	val focusRequester = remember { FocusRequester() }
 	val navigationRepository = koinInject<NavigationRepository>()
@@ -87,6 +92,9 @@ private fun MainToolbar(
 	val settingsViewModel = koinActivityViewModel<SettingsViewModel>()
 	val syncPlayViewModel = koinActivityViewModel<SyncPlayViewModel>()
 	val syncPlayState by syncPlayViewModel.syncPlayState.collectAsState()
+	val itemLauncher = koinInject<ItemLauncher>()
+	val userViewsRepository = koinInject<UserViewsRepository>()
+	val userViews by remember { userViewsRepository.views }.collectAsState(emptyList())
 	val activity = LocalActivity.current
 	val activeButtonColors = ButtonDefaults.colors(
 		containerColor = JellyfinTheme.colorScheme.buttonActive,
@@ -126,6 +134,24 @@ private fun MainToolbar(
 					)
 				}
 
+				IconButton(
+					onClick = {
+						if (activeButton != MainToolbarActiveButton.Home) {
+							navigationRepository.navigate(
+								Destinations.home,
+								replace = true,
+							)
+						}
+					},
+					colors = if (activeButton == MainToolbarActiveButton.Home) activeButtonColors else ButtonDefaults.colors(),
+					modifier = if (homeFocusRequester != null) Modifier.focusRequester(homeFocusRequester) else Modifier,
+				) {
+					Icon(
+						imageVector = ImageVector.vectorResource(R.drawable.ic_home),
+						contentDescription = stringResource(R.string.lbl_home),
+					)
+				}
+
 				NowPlayingComposable(
 					onFocusableChange = {},
 				)
@@ -137,32 +163,32 @@ private fun MainToolbar(
 					.focusRequester(focusRequester)
 			) {
 				ProvideTextStyle(JellyfinTheme.typography.default.copy(fontWeight = FontWeight.Bold)) {
-					Button(
-						onClick = {
-							if (activeButton != MainToolbarActiveButton.Home) {
-								navigationRepository.navigate(
-									Destinations.home,
-									replace = true,
-								)
-							}
-						},
-						colors = if (activeButton == MainToolbarActiveButton.Home) activeButtonColors else ButtonDefaults.colors(),
-						content = { Text(stringResource(R.string.lbl_home)) }
-					)
-					Button(
-						onClick = {
-							if (activeButton != MainToolbarActiveButton.Search) {
-								navigationRepository.navigate(Destinations.search())
-							}
-						},
-						colors = if (activeButton == MainToolbarActiveButton.Search) activeButtonColors else ButtonDefaults.colors(),
-						content = { Text(stringResource(R.string.lbl_search)) }
-					)
+					// Libraries (e.g. Film, Serie TV) live here instead of a "My media" row on home.
+					for (view in userViews.filter { userViewsRepository.isSupported(it.collectionType) }) {
+						Button(
+							onClick = { itemLauncher.launchUserView(view) },
+							content = { Text(view.name.orEmpty()) }
+						)
+					}
 				}
 			}
 		},
 		end = {
 			ToolbarButtons {
+				IconButton(
+					onClick = {
+						if (activeButton != MainToolbarActiveButton.Search) {
+							navigationRepository.navigate(Destinations.search())
+						}
+					},
+					colors = if (activeButton == MainToolbarActiveButton.Search) activeButtonColors else ButtonDefaults.colors(),
+				) {
+					Icon(
+						imageVector = ImageVector.vectorResource(R.drawable.ic_search),
+						contentDescription = stringResource(R.string.lbl_search),
+					)
+				}
+
 				if (syncPlayAvailable) IconButton(
 					onClick = syncPlayViewModel::show,
 					colors = if (syncPlayState.group != null) activeButtonColors else ButtonDefaults.colors(),

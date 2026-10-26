@@ -15,9 +15,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.preference.constant.WatchedIndicatorBehavior
@@ -35,6 +40,7 @@ import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.MediaType
 import org.koin.compose.koinInject
+import java.util.Locale
 
 @Composable
 @Stable
@@ -68,6 +74,8 @@ fun ItemCardBaseItemOverlay(
 	}
 }
 
+private val RatingGold = Color(0xFFFFC107)
+
 @Composable
 @Stable
 private fun StateIndicator(
@@ -78,10 +86,23 @@ private fun StateIndicator(
 	val isRecording = item.timerId?.takeIf { item.type == BaseItemKind.LIVE_TV_PROGRAM || item.type == BaseItemKind.PROGRAM } != null
 	val isRecordingActive = item.seriesTimerId != null && isRecording
 
+	val rating = item.communityRating?.takeIf { it > 0f }
+
 	Column(
 		modifier = modifier,
 		verticalArrangement = Arrangement.spacedBy(Tokens.Space.spaceXs)
 	) {
+		if (rating != null) {
+			// No background, like the Jellyfin Enhanced rating tag; the shadow keeps it readable on light posters.
+			Text(
+				text = "★ " + String.format(Locale.ROOT, "%.1f", rating),
+				color = RatingGold,
+				fontSize = 12.sp,
+				fontWeight = FontWeight.Bold,
+				style = TextStyle(shadow = Shadow(Color.Black, blurRadius = 6f)),
+			)
+		}
+
 		if (isRecording) {
 			Icon(
 				imageVector = ImageVector.vectorResource(R.drawable.ic_record_series),

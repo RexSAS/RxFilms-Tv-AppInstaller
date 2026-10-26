@@ -35,6 +35,7 @@ koin-compose = "4.2.2"
 kotest = "6.2.5"
 kotlin = "2.4.20"
 kotlinx-coroutines = "1.11.0"
+dadb = "1.2.10"
 kotlinx-serialization = "1.11.0"
 libass-android = "0.5.1"
 markwon = "4.6.2"
@@ -52,6 +53,7 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 
 [libraries]
+dadb = { module = "dev.mobile:dadb", version.ref = "dadb" }
 # Jellyfin
 jellyfin-sdk = { module = "org.jellyfin.sdk:jellyfin-core", version.ref = "jellyfin-sdk" }
 
