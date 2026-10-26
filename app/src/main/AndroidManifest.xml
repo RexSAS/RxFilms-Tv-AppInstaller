@@ -47,7 +47,6 @@
         android:name=".JellyfinApplication"
         android:allowBackup="true"
         android:appCategory="video"
-        android:banner="@drawable/app_banner_tv"
         android:dataExtractionRules="@xml/backup_rules"
         android:fullBackupContent="@xml/backup_content"
         android:icon="@mipmap/app_icon"
@@ -113,7 +112,6 @@
         <!-- Authentication -->
         <activity
             android:name=".ui.startup.StartupActivity"
-            android:banner="@drawable/app_banner_tv"
             android:exported="true"
             android:launchMode="singleTask"
             android:noHistory="true"
