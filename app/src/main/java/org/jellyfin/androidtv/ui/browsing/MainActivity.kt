@@ -30,6 +30,7 @@ import org.jellyfin.androidtv.ui.screensaver.InAppScreensaver
 import org.jellyfin.androidtv.ui.settings.compat.MainActivitySettings
 import org.jellyfin.androidtv.ui.startup.StartupActivity
 import org.jellyfin.androidtv.ui.syncplay.SyncPlayDialog
+import org.jellyfin.androidtv.ui.update.AppUpdater
 import org.jellyfin.androidtv.util.applyTheme
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
@@ -48,6 +49,8 @@ class MainActivity : FragmentActivity() {
 		super.onCreate(savedInstanceState)
 
 		if (!validateAuthentication()) return
+
+		lifecycleScope.launch { AppUpdater.check(this@MainActivity) }
 
 		interactionTrackerViewModel.keepScreenOn.flowWithLifecycle(lifecycle, Lifecycle.State.RESUMED)
 			.onEach { keepScreenOn ->
@@ -84,6 +87,8 @@ class MainActivity : FragmentActivity() {
 		super.onResume()
 
 		if (!validateAuthentication()) return
+
+		lifecycleScope.launch { AppUpdater.check(this@MainActivity) }
 
 		applyTheme()
 

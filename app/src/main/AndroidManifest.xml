@@ -9,6 +9,7 @@
     <!-- Generic permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission
         android:name="android.permission.ACCESS_WIFI_STATE"
         tools:ignore="LeanbackUsesWifi" />
@@ -86,6 +87,17 @@
                 android:value="androidx.startup" />
         </provider>
 
+        <!-- Hands downloaded app updates to the system installer -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.updates"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/update_paths" />
+        </provider>
+
         <provider
             android:name=".integration.MediaContentProvider"
             android:authorities="${applicationId}.content"
@@ -101,6 +113,7 @@
         <!-- Authentication -->
         <activity
             android:name=".ui.startup.StartupActivity"
+            android:banner="@mipmap/app_banner"
             android:exported="true"
             android:launchMode="singleTask"
             android:noHistory="true"
