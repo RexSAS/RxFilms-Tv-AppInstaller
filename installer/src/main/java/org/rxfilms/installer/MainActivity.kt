@@ -129,15 +129,12 @@ class MainActivity : Activity() {
 				log(getString(R.string.connecting, host))
 				withContext(Dispatchers.IO) {
 					Dadb.create(host, ADB_PORT, keyPair()).use { dadb ->
-						try {
-							dadb.install(apk)
-						} catch (error: Exception) {
-							// The store Jellyfin app shares the package name but not the signature: replace it.
-							if (error.message?.contains("UPDATE_INCOMPATIBLE") != true) throw error
+						// Replace the original Jellyfin app (or an RxFilms build from before the package rename).
+						if (dadb.shell("pm path $LEGACY_PACKAGE").output.isNotBlank()) {
 							withContext(Dispatchers.Main) { log(getString(R.string.replacing)) }
-							dadb.uninstall(TV_PACKAGE)
-							dadb.install(apk)
+							dadb.uninstall(LEGACY_PACKAGE)
 						}
+						dadb.install(apk)
 						dadb.shell("monkey -p $TV_PACKAGE -c android.intent.category.LEANBACK_LAUNCHER 1")
 					}
 				}
@@ -173,7 +170,8 @@ class MainActivity : Activity() {
 	private companion object {
 		const val REPOSITORY = "RexSAS/RxFilms-Tv-AppInstaller"
 		const val TV_ASSET_PREFIX = "rxfilms-tv"
-		const val TV_PACKAGE = "org.jellyfin.androidtv"
+		const val TV_PACKAGE = "org.rxfilms.tv"
+		const val LEGACY_PACKAGE = "org.jellyfin.androidtv"
 		const val ADB_PORT = 5555
 		const val SCAN_TIMEOUT_MILLIS = 400
 		const val SCAN_PARALLELISM = 64
