@@ -4,12 +4,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.jellyfin.androidtv.auth.repository.SessionRepository
+import org.jellyfin.playback.jellyfin.syncplay.SyncPlayAlert
 import org.jellyfin.playback.jellyfin.syncplay.SyncPlayClient
 import org.jellyfin.playback.jellyfin.syncplay.SyncPlayStatus
 import org.jellyfin.sdk.model.api.GroupInfoDto
@@ -31,6 +33,7 @@ class SyncPlayViewModel(
 	private val mutableUiState = MutableStateFlow(SyncPlayUiState())
 	val uiState: StateFlow<SyncPlayUiState> = mutableUiState.asStateFlow()
 	val syncPlayState: StateFlow<SyncPlayStatus> = client.state
+	val alerts: Flow<SyncPlayAlert> = client.alerts
 	private var operation: Job? = null
 	private var activeSession = sessionRepository.currentSession.value
 

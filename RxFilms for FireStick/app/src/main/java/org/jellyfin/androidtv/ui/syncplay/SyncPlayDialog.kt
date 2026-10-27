@@ -1,10 +1,13 @@
 package org.jellyfin.androidtv.ui.syncplay
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -17,6 +20,7 @@ import org.jellyfin.androidtv.ui.base.list.ListButton
 import org.jellyfin.androidtv.ui.base.list.ListSection
 import org.jellyfin.androidtv.ui.settings.composable.SettingsColumn
 import org.jellyfin.androidtv.ui.settings.composable.SettingsDialog
+import org.jellyfin.playback.jellyfin.syncplay.SyncPlayAlert
 import org.jellyfin.playback.jellyfin.syncplay.SyncPlayFailure
 import org.jellyfin.sdk.model.api.GroupStateType
 import org.jellyfin.sdk.model.api.SyncPlayUserAccessType
@@ -32,6 +36,18 @@ fun SyncPlayDialog() {
 	val syncState by viewModel.syncPlayState.collectAsState()
 	val user by userRepository.currentUser.collectAsState()
 	val access = user?.policy?.syncPlayAccess ?: SyncPlayUserAccessType.NONE
+	val context = LocalContext.current
+
+	// Lives in MainActivity, so alerts also show over the video player
+	LaunchedEffect(viewModel) {
+		viewModel.alerts.collect { alert ->
+			val text = when (alert) {
+				is SyncPlayAlert.UserJoined -> context.getString(R.string.syncplay_user_joined, alert.name)
+				is SyncPlayAlert.UserLeft -> context.getString(R.string.syncplay_user_left, alert.name)
+			}
+			Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
+		}
+	}
 
 	SettingsDialog(
 		visible = uiState.visible && access != SyncPlayUserAccessType.NONE,

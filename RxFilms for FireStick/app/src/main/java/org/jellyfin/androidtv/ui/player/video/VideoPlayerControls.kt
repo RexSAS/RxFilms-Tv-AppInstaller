@@ -6,13 +6,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,6 +26,7 @@ import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onVisibilityChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.DpOffset
@@ -41,6 +42,7 @@ import org.jellyfin.androidtv.ui.base.popover.Popover
 import org.jellyfin.androidtv.ui.composable.rememberPlayerPositionInfo
 import org.jellyfin.androidtv.ui.player.base.PlayerSeekbar
 import org.jellyfin.androidtv.ui.syncplay.SyncPlayViewModel
+import org.jellyfin.androidtv.util.getTimeFormatter
 import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.playback.core.model.PlayState
 import org.jellyfin.playback.core.queue.queue
@@ -49,6 +51,7 @@ import org.jellyfin.playback.jellyfin.syncplay.SyncPlayRequest
 import org.jellyfin.sdk.model.api.SyncPlayUserAccessType
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinActivityViewModel
+import java.time.LocalDateTime
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.DurationUnit
@@ -115,7 +118,6 @@ fun VideoPlayerControls(
 				.focusRestorer()
 				.focusGroup()
 		) {
-			Spacer(Modifier.weight(1f))
 			PositionText(playbackManager)
 		}
 	}
@@ -301,25 +303,26 @@ private fun Duration.formatted(includeHours: Boolean): String {
 }
 
 @Composable
-private fun PositionText(
+private fun RowScope.PositionText(
 	playbackManager: PlaybackManager,
 ) {
 	val positionInfo by rememberPlayerPositionInfo(playbackManager, precision = 1.seconds)
+	val speed by playbackManager.state.speed.collectAsState()
 	if (positionInfo.duration == Duration.ZERO) return
 
-	val text by remember {
-		derivedStateOf {
-			val includeHours = positionInfo.duration.inWholeMinutes >= 60
-			val activeFormatted = positionInfo.active.formatted(includeHours)
-			val durationFormatted = positionInfo.duration.formatted(includeHours)
-
-			"$activeFormatted / $durationFormatted"
-		}
-	}
+	val includeHours = positionInfo.duration.inWholeMinutes >= 60
+	val remaining = (positionInfo.duration - positionInfo.active) / speed.toDouble()
+	val endTime = LocalDateTime.now().plusSeconds(remaining.inWholeSeconds)
+	val style = LocalTextStyle.current.copy(color = Color.White)
 
 	Text(
-		text = text,
-		style = LocalTextStyle.current.copy(color = Color.White)
+		text = stringResource(R.string.lbl_playback_control_ends, LocalContext.current.getTimeFormatter().format(endTime)),
+		style = style,
+	)
+	Spacer(Modifier.weight(1f))
+	Text(
+		text = "${positionInfo.active.formatted(includeHours)} / ${positionInfo.duration.formatted(includeHours)}",
+		style = style,
 	)
 }
 

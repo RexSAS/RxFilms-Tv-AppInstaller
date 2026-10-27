@@ -5,7 +5,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
@@ -59,6 +62,8 @@ class SyncPlayCoordinator(
 	private val clock = SyncPlayClock()
 	private val mutableState = MutableStateFlow(SyncPlayStatus())
 	override val state: StateFlow<SyncPlayStatus> = mutableState.asStateFlow()
+	private val mutableAlerts = MutableSharedFlow<SyncPlayAlert>(extraBufferCapacity = ALERT_BUFFER)
+	override val alerts: SharedFlow<SyncPlayAlert> = mutableAlerts.asSharedFlow()
 	private val membershipMutex = Mutex()
 	private var player: SyncPlayPlayer? = null
 	private var preparedItem: UUID? = null
@@ -175,7 +180,14 @@ class SyncPlayCoordinator(
 					is SyncPlayGroupDoesNotExistUpdate -> failSession(SyncPlayFailure.GROUP_MISSING)
 					is SyncPlayLibraryAccessDeniedUpdate -> failSession(SyncPlayFailure.ACCESS_DENIED)
 					is SyncPlayStateUpdate -> mutableState.value = state.value.copy(group = state.value.group?.copy(state = update.data.state))
-					is SyncPlayUserJoinedUpdate, is SyncPlayUserLeftUpdate -> refreshParticipants(generation)
+					is SyncPlayUserJoinedUpdate -> {
+						mutableAlerts.tryEmit(SyncPlayAlert.UserJoined(update.data))
+						refreshParticipants(generation)
+					}
+					is SyncPlayUserLeftUpdate -> {
+						mutableAlerts.tryEmit(SyncPlayAlert.UserLeft(update.data))
+						refreshParticipants(generation)
+					}
 					else -> Unit
 				}
 			}
@@ -394,6 +406,7 @@ class SyncPlayCoordinator(
 
 	private companion object {
 		const val REQUEST_TIMEOUT_MILLIS = 10_000L
+		const val ALERT_BUFFER = 8
 		const val PREPARE_TIMEOUT_MILLIS = 30_000L
 		const val BUFFERING_DELAY_MILLIS = 3000L
 		const val INITIAL_SAMPLES = 3

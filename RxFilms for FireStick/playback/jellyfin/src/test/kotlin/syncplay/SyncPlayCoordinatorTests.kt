@@ -7,6 +7,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -18,6 +19,8 @@ import org.jellyfin.sdk.model.api.SyncPlayGroupJoinedUpdate
 import org.jellyfin.sdk.model.api.SyncPlayGroupLeftUpdate
 import org.jellyfin.sdk.model.api.SyncPlayPlayQueueUpdate
 import org.jellyfin.sdk.model.api.SyncPlayQueueItem
+import org.jellyfin.sdk.model.api.SyncPlayUserJoinedUpdate
+import org.jellyfin.sdk.model.api.SyncPlayUserLeftUpdate
 import org.jellyfin.sdk.model.api.UtcTimeResponse
 import java.util.UUID
 
@@ -227,6 +230,20 @@ class SyncPlayCoordinatorTests : FunSpec({
 			fixture.coordinator.request(SyncPlayRequest.Unpause)
 			fixture.transport.requests.last() shouldBe SyncPlayRequest.Unpause
 			fixture.player.playing shouldBe false
+		}
+	}
+
+	test("N01 members are alerted when another user joins or leaves the group") {
+		runTest {
+			val fixture = Fixture(this)
+			fixture.join()
+			val alerts = mutableListOf<SyncPlayAlert>()
+			backgroundScope.launch { fixture.coordinator.alerts.collect { alerts += it } }
+			runCurrent()
+			fixture.transport.events.emit(SyncPlayEvent.GroupUpdate(SyncPlayUserJoinedUpdate(groupId, "Sam")))
+			fixture.transport.events.emit(SyncPlayEvent.GroupUpdate(SyncPlayUserLeftUpdate(groupId, "Sam")))
+			runCurrent()
+			alerts shouldBe listOf(SyncPlayAlert.UserJoined("Sam"), SyncPlayAlert.UserLeft("Sam"))
 		}
 	}
 })

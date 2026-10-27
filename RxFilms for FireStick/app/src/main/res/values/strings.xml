@@ -732,5 +732,7 @@
     <string name="syncplay_error_disconnected">SyncPlay disconnected.</string>
     <string name="syncplay_error_playback">This item couldn’t be played with SyncPlay.</string>
     <string name="syncplay_error_group_missing">This SyncPlay group no longer exists.</string>
+    <string name="syncplay_user_joined">%1$s joined the group</string>
+    <string name="syncplay_user_left">%1$s left the group</string>
     <string name="syncplay_error_access_denied">You don’t have access to an item in this group.</string>
 </resources>
