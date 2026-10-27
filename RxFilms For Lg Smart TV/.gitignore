@@ -1,0 +1,3 @@
+# Written by build.sh, holds the Seerr API key.
+app/config.js
+dist/

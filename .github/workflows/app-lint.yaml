@@ -11,6 +11,10 @@ permissions:
   contents: read
   security-events: write
 
+defaults:
+  run:
+    working-directory: RxFilms for FireStick
+
 jobs:
   lint:
     name: Lint
@@ -31,11 +35,11 @@ jobs:
         uses: github/codeql-action/upload-sarif@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         if: ${{ always() }}
         with:
-          sarif_file: build/reports/detekt/detekt.sarif
+          sarif_file: RxFilms for FireStick/build/reports/detekt/detekt.sarif
           category: detekt
       - name: Upload Android SARIF
         uses: github/codeql-action/upload-sarif@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         if: ${{ always() }}
         with:
-          sarif_file: app/build/reports/lint-results-debug.sarif
+          sarif_file: RxFilms for FireStick/app/build/reports/lint-results-debug.sarif
           category: android

@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    working-directory: RxFilms for FireStick
+
 jobs:
   build:
     name: Build
@@ -34,4 +38,4 @@ jobs:
           name: build-artifacts
           retention-days: 14
           if-no-files-found: error
-          path: build/gh-app-publish/
+          path: RxFilms for FireStick/build/gh-app-publish/

@@ -1,0 +1,6 @@
+{
+	"name": "org.rxfilms.tv.service",
+	"version": "1.0.0",
+	"description": "Seerr requests for RxFilms",
+	"main": "service.js"
+}

@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    working-directory: RxFilms for FireStick
+
 jobs:
   test:
     name: Test

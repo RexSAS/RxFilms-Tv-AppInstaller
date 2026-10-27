@@ -5,6 +5,10 @@ on:
     tags:
       - v*
 
+defaults:
+  run:
+    working-directory: RxFilms for FireStick
+
 jobs:
   publish:
     name: Publish
@@ -61,7 +65,7 @@ jobs:
       - name: Upload release archive to repo.jellyfin.org
         env:
           TARGET_PATH: /srv/incoming/androidtv/v${{ env.JELLYFIN_VERSION }}/
-          SOURCE_PATH: build/jellyfin-publish/
+          SOURCE_PATH: RxFilms for FireStick/build/jellyfin-publish/
         run: rsync -vrptz -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" "$SOURCE_PATH" "${{ secrets.REPO_USER }}@${{ secrets.REPO_HOST }}:$TARGET_PATH"
 
       - name: Update repo.jellyfin.org symlinks

@@ -1,0 +1,10 @@
+{
+	"id": "org.rxfilms.tv.service",
+	"description": "Seerr requests for RxFilms",
+	"services": [
+		{
+			"name": "org.rxfilms.tv.service",
+			"description": "Seerr requests for RxFilms"
+		}
+	]
+}

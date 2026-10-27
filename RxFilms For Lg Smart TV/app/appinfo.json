@@ -1,0 +1,14 @@
+{
+	"id": "org.rxfilms.tv",
+	"version": "1.0.0",
+	"vendor": "RxFilms",
+	"type": "web",
+	"main": "index.html",
+	"title": "RxFilms",
+	"icon": "img/icon.png",
+	"largeIcon": "img/largeIcon.png",
+	"iconColor": "#7c0b09",
+	"resolution": "1920x1080",
+	"disableBackHistoryAPI": true,
+	"requiredACG": []
+}
