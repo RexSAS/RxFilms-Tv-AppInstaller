@@ -63,8 +63,15 @@ var SyncPlay = {
 				if (this.group) UI.toast('SyncPlay: left the group');
 				this.group = null;
 				break;
-			case 'UserJoined': UI.toast('SyncPlay: ' + update.Data + ' joined'); break;
-			case 'UserLeft': UI.toast('SyncPlay: ' + update.Data + ' left'); break;
+			case 'UserJoined':
+				if (this.group) this.group.Participants.push(update.Data);
+				UI.toast('SyncPlay: ' + update.Data + ' joined');
+				break;
+			case 'UserLeft':
+				var left = this.group ? this.group.Participants.indexOf(update.Data) : -1;
+				if (left >= 0) this.group.Participants.splice(left, 1);
+				UI.toast('SyncPlay: ' + update.Data + ' left');
+				break;
 			case 'GroupDoesNotExist': UI.toast('SyncPlay: that group no longer exists'); break;
 			case 'LibraryAccessDenied': UI.toast('SyncPlay: someone in the group cannot open this title'); break;
 			case 'PlayQueue': this.onPlayQueue(update.Data); break;
@@ -112,13 +119,24 @@ var SyncPlay = {
 	},
 
 	setQueue: function (item, startSeconds) {
-		this.request('SetNewQueue', { PlayingQueue: [item.Id], PlayingItemPosition: 0, StartPositionTicks: Math.round((startSeconds || 0) * 1e7) });
+		var self = this;
+		// Jellyfin web expands a lone episode to the rest of its series and then pairs that list with the group's queue
+		// entry by entry; with a one-entry queue it crashes and never gets ready. So send the queue it would build.
+		var ids = item.Type === 'Episode' && item.SeriesId
+			? Api.episodes(item.SeriesId, { startItemId: item.Id, isMissing: false }).then(function (episodes) {
+				var list = episodes.map(function (episode) { return episode.Id; });
+				return list[0] === item.Id ? list : [item.Id];
+			}).catch(function () { return [item.Id]; })
+			: Promise.resolve([item.Id]);
+		ids.then(function (list) {
+			self.request('SetNewQueue', { PlayingQueue: list, PlayingItemPosition: 0, StartPositionTicks: Math.round((startSeconds || 0) * 1e7) });
+		});
 	},
 
 	menu: function () {
 		var self = this;
 		if (this.group) {
-			return UI.menu('SyncPlay · ' + this.group.GroupName, [
+			return UI.menu('SyncPlay · ' + this.group.GroupName + ' (' + this.group.Participants.join(', ') + ')', [
 				{ label: 'Leave group', action: function () { self.request('Leave'); } },
 				{ label: 'Close' }
 			]);

@@ -238,6 +238,11 @@ function PlayerScreen(item, startSeconds, sync) {
 		if (!state.syncWaiting || !inGroup()) return;
 		state.syncWaiting = false;
 		SyncPlay.report('Ready', video.currentTime, !video.paused);
+		// The server holds everyone until every member has loaded; say so instead of looking stuck on "Loading…".
+		if (video.paused) {
+			spinner.textContent = 'Waiting for the others in ' + SyncPlay.group.GroupName + '…';
+			spinner.style.display = '';
+		}
 	}
 
 	video.addEventListener('loadedmetadata', function () {
@@ -248,6 +253,7 @@ function PlayerScreen(item, startSeconds, sync) {
 	video.addEventListener('seeked', syncReady);
 	video.addEventListener('playing', function () {
 		spinner.style.display = 'none';
+		spinner.textContent = 'Loading…';
 		if (state.reported) return report('/Progress');
 		state.reported = true;
 		report('');
@@ -275,6 +281,8 @@ function PlayerScreen(item, startSeconds, sync) {
 	video.addEventListener('ended', function () {
 		if (state.destroyed) return;
 		stopReporting();
+		// In a group the server moves everyone to the next queue entry (the rest of the series); it opens here by itself.
+		if (inGroup()) return SyncPlay.request('NextItem', { PlaylistItemId: sync.playlistItemId });
 		if (item.Type !== 'Episode' || sync) return App.back();
 		Api.episodes(item.SeriesId, { startItemId: item.Id, limit: 2 }).then(function (episodes) {
 			var next = episodes[1];
