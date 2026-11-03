@@ -43,6 +43,7 @@ import org.jellyfin.androidtv.ui.startup.fragment.SelectServerFragment
 import org.jellyfin.androidtv.ui.startup.fragment.ServerFragment
 import org.jellyfin.androidtv.ui.startup.fragment.SplashFragment
 import org.jellyfin.androidtv.ui.startup.fragment.StartupToolbarFragment
+import org.jellyfin.androidtv.util.WireGuardTunnel
 import org.jellyfin.androidtv.util.applyTheme
 import org.jellyfin.androidtv.util.createBundle
 import org.jellyfin.sdk.api.client.ApiClient
@@ -75,13 +76,16 @@ class StartupActivity : FragmentActivity() {
 	private val networkPermissionsRequester = registerForActivityResult(
 		ActivityResultContracts.RequestMultiplePermissions()
 	) { grants ->
-		val anyRejected = grants.any { !it.value }
+		// The app works without tunnel control, only the network permissions are required
+		val anyRejected = grants.any { !it.value && it.key != WireGuardTunnel.PERMISSION }
 
 		if (anyRejected) {
 			// Permission denied, exit the app.
 			Toast.makeText(this, R.string.no_network_permissions, Toast.LENGTH_LONG).show()
 			finish()
 		} else {
+			// The foreground event fired before this permission could be granted on first launch
+			WireGuardTunnel.setEnabled(this, true)
 			onPermissionsGranted()
 		}
 	}
@@ -99,7 +103,10 @@ class StartupActivity : FragmentActivity() {
 		if (!intent.getBooleanExtra(EXTRA_HIDE_SPLASH, false)) showSplash()
 
 		// Ensure basic permissions
-		networkPermissionsRequester.launch(arrayOf(Manifest.permission.INTERNET, Manifest.permission.ACCESS_NETWORK_STATE))
+		val permissions = arrayOf(Manifest.permission.INTERNET, Manifest.permission.ACCESS_NETWORK_STATE)
+		networkPermissionsRequester.launch(
+			if (WireGuardTunnel.isInstalled(this)) permissions + WireGuardTunnel.PERMISSION else permissions
+		)
 	}
 
 	override fun onResume() {

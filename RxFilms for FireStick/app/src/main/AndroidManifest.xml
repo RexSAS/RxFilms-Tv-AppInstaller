@@ -18,6 +18,9 @@
     <!-- Search permissions (voice to text) -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!-- Starts the WireGuard app's tunnel while RxFilms is open, on TVs that have it -->
+    <uses-permission android:name="com.wireguard.android.permission.CONTROL_TUNNELS" />
+
     <!-- Device feature requirements -->
     <uses-feature
         android:name="android.software.leanback"
@@ -30,6 +33,8 @@
         android:required="false" />
 
     <queries>
+        <package android:name="com.wireguard.android" />
+
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data

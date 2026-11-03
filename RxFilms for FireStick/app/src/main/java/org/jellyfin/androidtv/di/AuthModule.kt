@@ -12,6 +12,8 @@ import org.jellyfin.androidtv.auth.repository.SessionRepository
 import org.jellyfin.androidtv.auth.repository.SessionRepositoryImpl
 import org.jellyfin.androidtv.auth.store.AuthenticationPreferences
 import org.jellyfin.androidtv.auth.store.AuthenticationStore
+import org.jellyfin.androidtv.util.WireGuardTunnel
+import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
 
 val authModule = module {
@@ -27,6 +29,7 @@ val authModule = module {
 		SessionRepositoryImpl(
 			get(), get(), get(), get(), get(defaultDeviceInfo), get(), get(), get(), getAll(),
 			ProcessLifecycleOwner.get().lifecycleScope,
+			beforeRestore = { WireGuardTunnel.awaitConnected(androidContext()) },
 		)
 	}
 

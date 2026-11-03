@@ -66,6 +66,7 @@ class SessionRepositoryImpl(
 	private val telemetryPreferences: TelemetryPreferences,
 	private val sessionCleanups: List<SessionCleanup> = emptyList(),
 	private val cleanupScope: CoroutineScope? = null,
+	private val beforeRestore: suspend () -> Unit = {},
 ) : SessionRepository {
 	private val currentSessionMutex = Mutex()
 	private val _currentSession = MutableStateFlow<Session?>(null)
@@ -78,6 +79,8 @@ class SessionRepositoryImpl(
 			Timber.i("Restoring session")
 
 			_state.value = SessionRepositoryState.RESTORING_SESSION
+
+			if (!destroyOnly) beforeRestore()
 
 			val alwaysAuthenticate = authenticationPreferences[AuthenticationPreferences.alwaysAuthenticate]
 			val autoLoginBehavior = authenticationPreferences[AuthenticationPreferences.autoLoginUserBehavior]
