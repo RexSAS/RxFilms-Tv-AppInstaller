@@ -15,6 +15,7 @@ import org.jellyfin.playback.jellyfin.syncplay.SyncPlayAlert
 import org.jellyfin.playback.jellyfin.syncplay.SyncPlayClient
 import org.jellyfin.playback.jellyfin.syncplay.SyncPlayStatus
 import org.jellyfin.sdk.model.api.GroupInfoDto
+import timber.log.Timber
 import java.util.UUID
 
 enum class SyncPlayUiError { GROUPS, MEMBERSHIP, ACTION }
@@ -103,7 +104,8 @@ class SyncPlayViewModel(
 				if (!block()) mutableUiState.value = mutableUiState.value.copy(error = failure)
 			} catch (error: CancellationException) {
 				throw error
-			} catch (_: Exception) {
+			} catch (error: Exception) {
+				Timber.w(error, "SyncPlay: %s operation failed", failure)
 				mutableUiState.value = mutableUiState.value.copy(error = failure)
 			} finally {
 				mutableUiState.value = mutableUiState.value.copy(loading = false)

@@ -1,6 +1,8 @@
 package org.jellyfin.playback.jellyfin.syncplay
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.withContext
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.syncPlayApi
 import org.jellyfin.sdk.api.client.extensions.timeSyncApi
@@ -33,18 +35,21 @@ class SdkSyncPlayTransport(private val api: ApiClient) : SyncPlayTransport {
 	}
 	override val connectionState get() = api.webSocket.state
 
-	override suspend fun groups() = api.syncPlayApi.syncPlayGetGroups().content
-	override suspend fun createGroup(name: String) = api.syncPlayApi.syncPlayCreateGroup(NewGroupRequestDto(name)).content
+	// The SDK's OkHttp calls block the calling thread, and callers run on Main (NetworkOnMainThreadException).
+	private suspend fun <T> io(block: suspend () -> T): T = withContext(Dispatchers.IO) { block() }
+
+	override suspend fun groups() = io { api.syncPlayApi.syncPlayGetGroups().content }
+	override suspend fun createGroup(name: String) = io { api.syncPlayApi.syncPlayCreateGroup(NewGroupRequestDto(name)).content }
 	override suspend fun joinGroup(id: UUID) {
-		api.syncPlayApi.syncPlayJoinGroup(JoinGroupRequestDto(id))
+		io { api.syncPlayApi.syncPlayJoinGroup(JoinGroupRequestDto(id)) }
 	}
 	override suspend fun leaveGroup() {
-		api.syncPlayApi.syncPlayLeaveGroup()
+		io { api.syncPlayApi.syncPlayLeaveGroup() }
 	}
-	override suspend fun time() = api.timeSyncApi.getUtcTime().content
+	override suspend fun time() = io { api.timeSyncApi.getUtcTime().content }
 
 	@Suppress("CyclomaticComplexMethod") // Exhaustive mapping of the protocol request variants.
-	override suspend fun send(request: SyncPlayRequest) {
+	override suspend fun send(request: SyncPlayRequest): Unit = io {
 		val syncPlay = api.syncPlayApi
 		when (request) {
 			SyncPlayRequest.Pause -> syncPlay.syncPlayPause()

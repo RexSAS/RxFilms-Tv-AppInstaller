@@ -29,6 +29,7 @@ import org.jellyfin.sdk.model.api.SyncPlayPlayQueueUpdate
 import org.jellyfin.sdk.model.api.SyncPlayStateUpdate
 import org.jellyfin.sdk.model.api.SyncPlayUserJoinedUpdate
 import org.jellyfin.sdk.model.api.SyncPlayUserLeftUpdate
+import timber.log.Timber
 import java.time.Duration
 import java.time.ZoneId
 import java.util.UUID
@@ -95,7 +96,8 @@ class SyncPlayCoordinator(
 				transport.events.collect { if (current(generation)) onEvent(generation, it) }
 			} catch (error: CancellationException) {
 				throw error
-			} catch (_: Exception) {
+			} catch (error: Exception) {
+				Timber.w(error, "SyncPlay: event stream failed")
 				if (current(generation)) failSession(SyncPlayFailure.DISCONNECTED)
 			}
 		}
@@ -118,7 +120,8 @@ class SyncPlayCoordinator(
 		} catch (error: CancellationException) {
 			if (current(generation)) failSession(SyncPlayFailure.REQUEST)
 			throw error
-		} catch (_: Exception) {
+		} catch (error: Exception) {
+			Timber.w(error, "SyncPlay: join/create failed")
 			if (current(generation)) failSession(SyncPlayFailure.REQUEST)
 			false
 		}
@@ -149,7 +152,8 @@ class SyncPlayCoordinator(
 					} else scheduler.cancel()
 				} catch (error: CancellationException) {
 					throw error
-				} catch (_: Exception) {
+				} catch (error: Exception) {
+					Timber.w(error, "SyncPlay: clock sync failed")
 					// Retry clock acquisition, not playback mutations.
 				}
 				delay(if (++samples < INITIAL_SAMPLES) INITIAL_POLL_MILLIS else POLL_MILLIS)
@@ -159,6 +163,7 @@ class SyncPlayCoordinator(
 
 	@Suppress("CyclomaticComplexMethod") // Exhaustive dispatch over the SDK's sealed update protocol.
 	private suspend fun onEvent(generation: Long, event: SyncPlayEvent) {
+		Timber.i("SyncPlay: received %s", event)
 		when (event) {
 			is SyncPlayEvent.Command -> if (session.acceptCommand(generation, event.data)) {
 				publish()
@@ -248,6 +253,7 @@ class SyncPlayCoordinator(
 
 	@Suppress("CyclomaticComplexMethod") // Reconciles orthogonal clock, queue, occurrence, and preparation states.
 	private fun reconcilePlayback() {
+		Timber.i("SyncPlay: reconcile following=%s clockReady=%s player=%s", state.value.following, state.value.clockReady, player != null)
 		if (!state.value.following || !state.value.clockReady) return
 		val activePlayer = player ?: return
 		val snapshot = session.state.value
@@ -271,18 +277,24 @@ class SyncPlayCoordinator(
 			prepareJob = scope.launch {
 				try {
 					val start = command?.positionTicks ?: snapshot.queue?.startPositionTicks ?: 0
+					Timber.i("SyncPlay: preparing %s at %d", item.itemId, start)
 					withTimeout(PREPARE_TIMEOUT_MILLIS) { activePlayer.prepare(item, start) }
+					Timber.i("SyncPlay: prepared %s", item.itemId)
 					if (!current(generation) || session.state.value.currentItem != item || player != activePlayer) return@launch
 					preparedItem = item.playlistItemId
 					loadingItem = null
 					report(buffering = false)
 					if (current(generation)) session.state.value.playbackCommand?.let(scheduler::schedule)
-				} catch (error: CancellationException) { throw error } catch (_: Exception) { playbackFailed() }
+				} catch (error: CancellationException) { throw error } catch (error: Exception) {
+					Timber.w(error, "SyncPlay: prepare failed")
+					playbackFailed()
+				}
 			}
 		} else if (command != null) scheduler.schedule(command)
 	}
 
 	private fun applyAction(action: SyncPlayAction) {
+		Timber.i("SyncPlay: applying %s", action)
 		val activePlayer = player ?: return
 		val generation = session.state.value.generation
 		actionJob?.cancel()
@@ -310,7 +322,10 @@ class SyncPlayCoordinator(
 						}
 					}
 				}
-			} catch (error: CancellationException) { throw error } catch (_: Exception) { playbackFailed() }
+			} catch (error: CancellationException) { throw error } catch (error: Exception) {
+				Timber.w(error, "SyncPlay: %s failed", action)
+				playbackFailed()
+			}
 		}
 	}
 
@@ -328,7 +343,8 @@ class SyncPlayCoordinator(
 		return try {
 			withTimeout(REQUEST_TIMEOUT_MILLIS) { transport.send(request) }
 			current(generation)
-		} catch (error: CancellationException) { throw error } catch (_: Exception) {
+		} catch (error: CancellationException) { throw error } catch (error: Exception) {
+			Timber.w(error, "SyncPlay: request %s failed", request)
 			if (current(generation)) mutableState.value = state.value.copy(error = SyncPlayFailure.REQUEST)
 			false
 		}
