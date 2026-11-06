@@ -22,11 +22,11 @@ class UserSettingPreferences(
 		val homesection2 = enumPreference("homesection2", HomeSectionType.NEXT_UP)
 		val homesection3 = enumPreference("homesection3", HomeSectionType.TOP_10)
 		val homesection4 = enumPreference("homesection4", HomeSectionType.SEERR_RECOMMENDED)
-		val homesection5 = enumPreference("homesection5", HomeSectionType.BECAUSE_YOU_WATCHED)
+		val homesection5 = enumPreference("homesection5", HomeSectionType.FRANCHISES)
 		val homesection6 = enumPreference("homesection6", HomeSectionType.LATEST_MEDIA)
-		val homesection7 = enumPreference("homesection7", HomeSectionType.FRANCHISES)
-		val homesection8 = enumPreference("homesection8", HomeSectionType.GENRES)
-		val homesection9 = enumPreference("homesection9", HomeSectionType.LIVE_TV)
+		val homesection7 = enumPreference("homesection7", HomeSectionType.LIVE_TV)
+		val homesection8 = enumPreference("homesection8", HomeSectionType.NONE)
+		val homesection9 = enumPreference("homesection9", HomeSectionType.NONE)
 	}
 
 	val homesections = listOf(

@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -12,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import org.jellyfin.androidtv.preference.constant.ZoomMode
 import org.jellyfin.androidtv.ui.composable.rememberQueueEntry
 import org.jellyfin.androidtv.ui.player.base.PlayerOverlayLayout
 import org.jellyfin.androidtv.ui.player.base.rememberPlayerOverlayVisibility
@@ -27,6 +29,7 @@ fun VideoPlayerOverlay(
 	modifier: Modifier = Modifier,
 	playbackManager: PlaybackManager = koinInject(),
 	mediaToastRegistry: MediaToastRegistry,
+	zoom: MutableState<ZoomMode>? = null,
 ) {
 	val visibilityState = rememberPlayerOverlayVisibility()
 	var showPlaybackInfo by remember { mutableStateOf(false) }
@@ -37,6 +40,7 @@ fun VideoPlayerOverlay(
 	Box(modifier = modifier) {
 		PlayerOverlayLayout(
 			visibilityState = visibilityState,
+			onSelect = rememberPlayPauseToggle(playbackManager),
 			header = {
 				Column {
 					VideoPlayerHeader(
@@ -48,6 +52,7 @@ fun VideoPlayerOverlay(
 				VideoPlayerControls(
 					playbackManager = playbackManager,
 					onPlaybackInfoClick = { showPlaybackInfo = !showPlaybackInfo },
+					zoom = zoom,
 				)
 			},
 		)

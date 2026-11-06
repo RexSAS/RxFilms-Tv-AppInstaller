@@ -24,9 +24,13 @@ object AppUpdater {
 	private const val LATEST_RELEASE = "https://api.github.com/repos/RexSAS/RxFilms-Tv-AppInstaller/releases/latest"
 	private const val TV_ASSET_PREFIX = "rxfilms-tv"
 
+	// Offer once per app run, and remember a download that waits for the install permission.
+	private var offered = false
+	private var pendingUrl: String? = null
+
 	suspend fun <T> check(activity: T) where T : Activity, T : LifecycleOwner {
 		// Debug builds have their own package and "dev" versions; only release builds can update themselves.
-		if (BuildConfig.DEBUG) return
+		if (BuildConfig.DEBUG || offered) return
 
 		val release = withContext(Dispatchers.IO) {
 			runCatching { JSONObject(URL(LATEST_RELEASE).readText()) }.onFailure { Timber.w(it, "Update check failed") }.getOrNull()
@@ -37,7 +41,8 @@ object AppUpdater {
 		val url = (0 until assets.length()).map(assets::getJSONObject)
 			.firstOrNull { it.getString("name").startsWith(TV_ASSET_PREFIX) && it.getString("name").endsWith(".apk") }
 			?.getString("browser_download_url") ?: return
-		if (activity.isFinishing) return
+		if (activity.isFinishing || offered) return
+		offered = true
 
 		AlertDialog.Builder(activity)
 			.setTitle(R.string.update_available_title)
@@ -47,12 +52,27 @@ object AppUpdater {
 			.show()
 	}
 
+	/** Starts the download the user already accepted, once they come back with the install permission granted. */
+	fun <T> resume(activity: T) where T : Activity, T : LifecycleOwner {
+		val url = pendingUrl ?: return
+		if (!activity.packageManager.canRequestPackageInstalls()) return
+		pendingUrl = null
+		activity.lifecycleScope.launch { install(activity, url) }
+	}
+
 	private suspend fun install(activity: Activity, url: String) {
 		if (!activity.packageManager.canRequestPackageInstalls()) {
-			Toast.makeText(activity, R.string.update_allow_install, Toast.LENGTH_LONG).show()
-			runCatching {
-				activity.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${activity.packageName}")))
-			}
+			pendingUrl = url
+			// Fire OS has no per-app permission page; the switch lives under Developer options.
+			AlertDialog.Builder(activity)
+				.setTitle(R.string.update_available_title)
+				.setMessage(R.string.update_allow_install)
+				.setPositiveButton(R.string.update_open_settings) { _, _ ->
+					runCatching { activity.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${activity.packageName}"))) }
+						.recoverCatching { activity.startActivity(Intent(Settings.ACTION_SETTINGS)) }
+				}
+				.setNegativeButton(R.string.update_later) { _, _ -> pendingUrl = null }
+				.show()
 			return
 		}
 

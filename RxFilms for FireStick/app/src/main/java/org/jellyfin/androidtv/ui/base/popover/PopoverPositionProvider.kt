@@ -49,8 +49,9 @@ class PopoverPositionProvider(
 
 		// Return position clamped to fit in window with overscan
 		return IntOffset(
-			x = x.coerceIn(OVERSCAN_X, windowSize.width - popupContentSize.width - OVERSCAN_X),
-			y = y.coerceIn(OVERSCAN_Y, windowSize.height - popupContentSize.height - OVERSCAN_Y),
+			// A popup larger than the window would make the range empty and crash; pin it to the start edge instead.
+			x = x.coerceIn(OVERSCAN_X, (windowSize.width - popupContentSize.width - OVERSCAN_X).coerceAtLeast(OVERSCAN_X)),
+			y = y.coerceIn(OVERSCAN_Y, (windowSize.height - popupContentSize.height - OVERSCAN_Y).coerceAtLeast(OVERSCAN_Y)),
 		)
 	}
 

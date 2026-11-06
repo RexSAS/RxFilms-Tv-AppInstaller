@@ -1,6 +1,8 @@
 package org.jellyfin.playback.core.backend
 
 import org.jellyfin.playback.core.mediastream.MediaStream
+import org.jellyfin.playback.core.model.PlayerTrack
+import org.jellyfin.playback.core.model.PlayerTrackType
 import org.jellyfin.playback.core.model.PositionInfo
 import org.jellyfin.playback.core.queue.QueueEntry
 import org.jellyfin.playback.core.support.PlaySupportReport
@@ -41,5 +43,11 @@ interface PlayerBackend {
 	fun setSpeed(speed: Float)
 
 	fun setTimedEvents(timedEvents: List<TimedEvent>)
+
+	// Tracks inside the current item; backends without track selection report none.
+	fun getTracks(type: PlayerTrackType): List<PlayerTrack> = emptyList()
+
+	/** Selects a track from [getTracks]; a null [id] turns the type off (subtitles). */
+	fun selectTrack(type: PlayerTrackType, id: String?) = Unit
 }
 

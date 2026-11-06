@@ -127,6 +127,11 @@ class SeerrCardPresenter : Presenter() {
 		val context = parent.context
 		val border = GradientDrawable().apply { cornerRadius = 6.dp(context).toFloat() }
 		val poster = AsyncImageView(context).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
+		// A tiny thumbnail stretched to the card looks blurred; it arrives fast and covers the wait for the real poster.
+		val preview = AsyncImageView(context).apply {
+			scaleType = ImageView.ScaleType.CENTER_CROP
+			setBackgroundColor(Color.rgb(40, 40, 40))
+		}
 		// Darkens the bottom of the poster so the rank number stays readable.
 		val rankShade = View(context).apply {
 			background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(Color.TRANSPARENT, Color.argb(200, 0, 0, 0)))
@@ -154,6 +159,7 @@ class SeerrCardPresenter : Presenter() {
 			layoutParams = ViewGroup.LayoutParams(CARD_WIDTH.dp(context), ViewGroup.LayoutParams.WRAP_CONTENT)
 			addView(FrameLayout(context).apply {
 				foreground = border
+				addView(preview, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER))
 				addView(poster, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER))
 				addView(rankShade, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (CARD_WIDTH * 3 / 4).dp(context), Gravity.BOTTOM))
 				addView(rank, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.START).apply {
@@ -171,9 +177,10 @@ class SeerrCardPresenter : Presenter() {
 		val title = item as? SeerrTitle ?: return
 		val card = viewHolder.view as LinearLayout
 		val posterFrame = card.getChildAt(0) as FrameLayout
-		(posterFrame.getChildAt(0) as AsyncImageView).load(url = title.posterUrl, aspectRatio = 2.0 / 3.0)
-		posterFrame.getChildAt(1).visibility = if (title.rank != null) View.VISIBLE else View.GONE
-		(posterFrame.getChildAt(2) as TextView).apply {
+		(posterFrame.getChildAt(0) as AsyncImageView).load(url = title.posterPath?.let { "https://image.tmdb.org/t/p/w45$it" })
+		(posterFrame.getChildAt(1) as AsyncImageView).load(url = title.posterUrl, aspectRatio = 2.0 / 3.0)
+		posterFrame.getChildAt(2).visibility = if (title.rank != null) View.VISIBLE else View.GONE
+		(posterFrame.getChildAt(3) as TextView).apply {
 			visibility = if (title.rank != null) View.VISIBLE else View.GONE
 			text = title.rank?.toString()
 			setTextColor(

@@ -6,6 +6,8 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import kotlinx.coroutines.withContext
+import org.jellyfin.playback.core.PlaybackManager
+import org.jellyfin.playback.core.model.PlayState
 import org.jellyfin.playback.core.plugin.PlayerService
 import org.jellyfin.playback.core.queue.QueueEntry
 import org.jellyfin.playback.core.queue.queue
@@ -67,6 +69,12 @@ internal class MediaStreamService(
 		)
 	}
 
+	/** Asks the resolvers again for [entry], e.g. after the quality preference changed. */
+	suspend fun reload(entry: QueueEntry) {
+		entry.mediaStream = null
+		playEntry(entry)
+	}
+
 	private suspend fun playEntry(entry: QueueEntry) {
 		val backend = requireNotNull(manager.backend)
 		val hasMediaStream = entry.ensureMediaStream()
@@ -98,4 +106,14 @@ internal class MediaStreamService(
 			backend.prepareItem(nextItem)
 		}
 	}
+}
+
+/** Re-requests the current item's stream and returns to the same position and play/pause state. */
+suspend fun PlaybackManager.reloadCurrentEntry() {
+	val entry = queue.entry.value ?: return
+	val position = state.positionInfo.active
+	val wasPaused = state.playState.value != PlayState.PLAYING
+	getService(MediaStreamService::class)?.reload(entry) ?: return
+	state.seek(position)
+	if (wasPaused) state.pause()
 }

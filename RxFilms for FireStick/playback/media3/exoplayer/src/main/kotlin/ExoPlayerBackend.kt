@@ -6,10 +6,12 @@ import android.view.ViewGroup
 import androidx.annotation.OptIn
 import androidx.core.content.getSystemService
 import androidx.media3.common.C
+import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
+import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.VideoSize
 import androidx.media3.common.text.CueGroup
@@ -38,6 +40,8 @@ import org.jellyfin.playback.core.mediastream.mediatype.MediaType
 import org.jellyfin.playback.core.mediastream.mediatype.mediaType
 import org.jellyfin.playback.core.mediastream.normalizationGain
 import org.jellyfin.playback.core.model.PlayState
+import org.jellyfin.playback.core.model.PlayerTrack
+import org.jellyfin.playback.core.model.PlayerTrackType
 import org.jellyfin.playback.core.model.PositionInfo
 import org.jellyfin.playback.core.queue.QueueEntry
 import org.jellyfin.playback.core.support.PlaySupportReport
@@ -47,6 +51,7 @@ import org.jellyfin.playback.core.ui.PlayerSurfaceView
 import org.jellyfin.playback.media3.exoplayer.support.getPlaySupportReport
 import org.jellyfin.playback.media3.exoplayer.support.toFormats
 import timber.log.Timber
+import java.util.Locale
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -340,4 +345,52 @@ class ExoPlayerBackend(
 	override fun setTimedEvents(timedEvents: List<TimedEvent>) {
 		timedEventState.setTimedEvents(exoPlayer, timedEvents)
 	}
+
+	override fun getTracks(type: PlayerTrackType): List<PlayerTrack> {
+		val groups = exoPlayer.currentTracks.groups
+		return groups.indices.filter { groups[it].type == type.media3Type }.flatMap { groupIndex ->
+			val group = groups[groupIndex]
+			(0 until group.length).filter(group::isTrackSupported).map { trackIndex ->
+				PlayerTrack(
+					id = "$groupIndex:$trackIndex",
+					label = group.getTrackFormat(trackIndex).trackLabel(),
+					selected = group.isTrackSelected(trackIndex),
+				)
+			}
+		}
+	}
+
+	override fun selectTrack(type: PlayerTrackType, id: String?) {
+		val parameters = exoPlayer.trackSelectionParameters.buildUpon()
+		if (id == null) {
+			parameters.setTrackTypeDisabled(type.media3Type, true)
+		} else {
+			val (groupIndex, trackIndex) = id.split(':').map(String::toInt)
+			val group = exoPlayer.currentTracks.groups.getOrNull(groupIndex) ?: return
+			parameters
+				.setTrackTypeDisabled(type.media3Type, false)
+				.setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, trackIndex))
+		}
+		exoPlayer.trackSelectionParameters = parameters.build()
+	}
+
+	private val PlayerTrackType.media3Type
+		get() = when (this) {
+			PlayerTrackType.AUDIO -> C.TRACK_TYPE_AUDIO
+			PlayerTrackType.SUBTITLE -> C.TRACK_TYPE_TEXT
+		}
+}
+
+/** "English · 5.1" style label from whatever the container provides. */
+internal fun Format.trackLabel(): String {
+	val language = language?.takeUnless { it == C.LANGUAGE_UNDETERMINED }?.let { Locale.forLanguageTag(it).displayLanguage }
+	val channels = when (channelCount) {
+		Format.NO_VALUE, 0 -> null
+		1 -> "Mono"
+		2 -> "Stereo"
+		6 -> "5.1"
+		8 -> "7.1"
+		else -> "$channelCount ch"
+	}
+	return listOfNotNull(label, language, channels).distinct().joinToString(" · ").ifEmpty { id ?: "Track" }
 }

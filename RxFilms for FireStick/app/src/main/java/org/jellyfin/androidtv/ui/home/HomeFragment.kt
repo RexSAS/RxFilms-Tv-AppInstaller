@@ -4,7 +4,22 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
+import org.jellyfin.androidtv.R
+import org.jellyfin.androidtv.ui.base.CircularProgressIndicator
+import kotlin.time.Duration.Companion.seconds
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -42,6 +57,9 @@ import org.jellyfin.androidtv.ui.shared.toolbar.MainToolbar
 import org.jellyfin.androidtv.ui.shared.toolbar.MainToolbarActiveButton
 import org.koin.android.ext.android.inject
 
+/** Once per app start: coming back to home from another screen doesn't show the loading screen again. */
+private var splashShown = false
+
 class HomeFragment : Fragment() {
 	private val sessionRepository by inject<SessionRepository>()
 	private val serverRepository by inject<ServerRepository>()
@@ -62,6 +80,17 @@ class HomeFragment : Fragment() {
 			toolbarFocusRequest[0] = false
 		}
 		LaunchedEffect(rowsFocusRequester) { rowsFocusRequester.requestFocus() }
+
+		// Loading screen on app start, so the home doesn't show bare titles while rows and posters download.
+		var loading by remember { mutableStateOf(!splashShown) }
+		var rowsAdded by remember { mutableStateOf(false) }
+		LaunchedEffect(rowsAdded) {
+			if (!loading) return@LaunchedEffect
+			// Once the rows and the media bar picture are in, give the posters a moment; never wait forever.
+			delay(if (rowsAdded) 0.7.seconds else 10.seconds)
+			loading = false
+			splashShown = true
+		}
 
 		// The rows fill the whole screen so the media bar can sit behind the toolbar; the toolbar gets a shadow to stay readable.
 		Box {
@@ -96,6 +125,7 @@ class HomeFragment : Fragment() {
 				onUpdate = { fragment ->
 					rowsSupportFragment = fragment
 					fragment.onFocusToolbar = focusToolbar
+					fragment.onRowsAdded = { rowsAdded = true }
 				}
 			)
 
@@ -111,6 +141,25 @@ class HomeFragment : Fragment() {
 					}
 			) {
 				MainToolbar(MainToolbarActiveButton.Home, homeFocusRequester = toolbarFocusRequester)
+			}
+
+			AnimatedVisibility(visible = loading, enter = EnterTransition.None, exit = fadeOut()) {
+				Box(
+					contentAlignment = Alignment.Center,
+					modifier = Modifier
+						.fillMaxSize()
+						.background(Color.Black),
+				) {
+					Column(horizontalAlignment = Alignment.CenterHorizontally) {
+						Image(
+							painter = painterResource(R.drawable.app_logo),
+							contentDescription = null,
+							modifier = Modifier.height(120.dp),
+						)
+						Spacer(Modifier.height(32.dp))
+						CircularProgressIndicator(color = Color.White, modifier = Modifier.size(40.dp))
+					}
+				}
 			}
 		}
 	}

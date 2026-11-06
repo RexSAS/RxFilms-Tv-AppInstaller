@@ -22,6 +22,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusTarget
 import androidx.compose.ui.graphics.Brush
@@ -48,9 +50,12 @@ fun PlayerOverlayLayout(
 	visibilityState: PlayerOverlayVisibilityState = rememberPlayerOverlayVisibility(),
 	header: (@Composable () -> Unit)? = null,
 	controls: (@Composable () -> Unit)? = null,
+	/** OK while the controls are hidden; the other keys show the controls. */
+	onSelect: (() -> Unit)? = null,
 ) = Box(
 	modifier = modifier
 		.fillMaxSize()
+		.focusRequester(rootFocusRequester(visibilityState.visible))
 		.focusable()
 		.onPreviewKeyEvent {
 			// Reset hide timer on key presses
@@ -59,7 +64,10 @@ fun PlayerOverlayLayout(
 			// Otherwise, only act on key down
 			if (it.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
 
-			if (it.key == Key.Back && visibilityState.visible) {
+			if (onSelect != null && !visibilityState.visible && it.key in selectKeys) {
+				onSelect()
+				true
+			} else if (it.key == Key.Back && visibilityState.visible) {
 				visibilityState.hide()
 				true
 			} else if (!it.nativeKeyEvent.isSystem && !visibilityState.visible) {
@@ -148,6 +156,18 @@ fun PlayerOverlayLayout(
 			}
 		}
 	}
+}
+
+private val selectKeys = setOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
+
+/** When the controls hide, their focused button disappears and keys went nowhere ("OK does nothing"); take focus back. */
+@Composable
+private fun rootFocusRequester(visible: Boolean): FocusRequester {
+	val focusRequester = remember { FocusRequester() }
+	LaunchedEffect(visible) {
+		if (!visible) runCatching { focusRequester.requestFocus() }
+	}
+	return focusRequester
 }
 
 data class PlayerOverlayVisibilityState(

@@ -97,6 +97,9 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	/** Set by HomeFragment; moves focus to the toolbar drawn over these rows. */
 	var onFocusToolbar: () -> Unit = {}
 
+	/** Set by HomeFragment; called once the rows are in place so the loading screen can go. */
+	var onRowsAdded: () -> Unit = {}
+
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
 
@@ -112,7 +115,16 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			}
 
 			// Start out with default sections
+			// The order is stored on the server and shared with Jellyfin web, so RxFilms' layout is enforced here:
+			// no "Because you watched" or genre rows, and Recently added right under Franchises.
 			val homesections = userSettingPreferences.activeHomesections
+				.filterNot { it == HomeSectionType.BECAUSE_YOU_WATCHED || it == HomeSectionType.GENRES }
+				.let { sections ->
+					if (HomeSectionType.FRANCHISES !in sections || HomeSectionType.LATEST_MEDIA !in sections) sections
+					else sections.minus(HomeSectionType.LATEST_MEDIA).flatMap {
+						if (it == HomeSectionType.FRANCHISES) listOf(it, HomeSectionType.LATEST_MEDIA) else listOf(it)
+					}
+				}
 
 			// Make sure the rows are empty
 			val rows = mutableListOf<HomeFragmentRow>()
@@ -159,6 +171,8 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				notificationsRow.addToRowsAdapter(requireContext(), cardPresenter, adapter as MutableObjectAdapter<Row>)
 				nowPlaying.addToRowsAdapter(requireContext(), cardPresenter, adapter as MutableObjectAdapter<Row>)
 				for (row in rows) row.addToRowsAdapter(requireContext(), cardPresenter, adapter as MutableObjectAdapter<Row>)
+				if (HomeSectionType.MEDIA_BAR in homesections) launch { mediaBarRow.ready.await(); onRowsAdded() }
+				else onRowsAdded()
 
 				// Wire up Live TV sibling rows so the On Now row removes the buttons row when empty
 				@Suppress("UNCHECKED_CAST")

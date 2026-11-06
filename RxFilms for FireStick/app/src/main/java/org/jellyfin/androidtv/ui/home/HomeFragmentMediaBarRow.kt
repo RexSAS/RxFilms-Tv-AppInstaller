@@ -49,7 +49,13 @@ import androidx.leanback.widget.Presenter
 import androidx.leanback.widget.Row
 import androidx.leanback.widget.RowPresenter
 import androidx.lifecycle.LifecycleCoroutineScope
+import coil3.ImageLoader
+import coil3.request.ImageRequest
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import org.koin.core.context.GlobalContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -97,6 +103,9 @@ class HomeFragmentMediaBarRow(
 	private val navigationRepository: NavigationRepository,
 	private val onUp: () -> Unit,
 ) : HomeFragmentRow, OnItemViewClickedListener {
+	/** Completes once the first slide's pictures are downloaded (or loading gave up), for the home loading screen. */
+	val ready = CompletableDeferred<Unit>()
+
 	override fun addToRowsAdapter(context: Context, cardPresenter: CardPresenter, rowsAdapter: MutableObjectAdapter<Row>) {
 		val adapter = MutableObjectAdapter<MediaBar>(MediaBarPresenter(api, onUp))
 		val row = MediaBarRow(adapter)
@@ -119,6 +128,16 @@ class HomeFragmentMediaBarRow(
 			}
 			if (items.isEmpty()) rowsAdapter.remove(row)
 			else adapter.add(MediaBar(items))
+
+			// Same URLs as MediaBarContent, so slides show them straight from the image cache instead of a dark frame.
+			val imageLoader = GlobalContext.get().get<ImageLoader>()
+			fun prefetch(item: BaseItemDto) = listOfNotNull(
+				api.imageApi.getItemImageUrl(item.id, ImageType.BACKDROP, maxWidth = 1920, tag = item.backdropImageTags?.firstOrNull()),
+				item.imageTags?.get(ImageType.LOGO)?.let { api.imageApi.getItemImageUrl(item.id, ImageType.LOGO, maxWidth = 800, tag = it) },
+			).map { url -> async { imageLoader.execute(ImageRequest.Builder(context).data(url).build()) } }
+			items.firstOrNull()?.let { prefetch(it).awaitAll() }
+			ready.complete(Unit)
+			for (item in items.drop(1)) prefetch(item).awaitAll()
 		}
 	}
 

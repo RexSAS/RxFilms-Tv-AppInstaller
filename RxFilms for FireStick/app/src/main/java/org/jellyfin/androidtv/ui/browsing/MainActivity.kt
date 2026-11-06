@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
+import org.jellyfin.androidtv.R
 import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.fragment.app.Fragment
@@ -88,7 +89,7 @@ class MainActivity : FragmentActivity() {
 
 		if (!validateAuthentication()) return
 
-		lifecycleScope.launch { AppUpdater.check(this@MainActivity) }
+		AppUpdater.resume(this)
 
 		applyTheme()
 
@@ -133,6 +134,15 @@ class MainActivity : FragmentActivity() {
 
 	private fun onKeyEvent(keyCode: Int, event: KeyEvent?): Boolean = supportFragmentManager.fragments
 		.any { it.onKeyEvent(keyCode, event) }
+
+	override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+		// The player (SyncPlay especially) can open after the focused screen is gone, leaving nothing focused:
+		// OK was lost and the first arrow press only restored focus. Hand focus to the current screen first.
+		if (currentFocus == null && event.action == KeyEvent.ACTION_DOWN) {
+			findViewById<View>(R.id.container)?.requestFocus()
+		}
+		return super.dispatchKeyEvent(event)
+	}
 
 	override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean =
 		onKeyEvent(keyCode, event) || super.onKeyDown(keyCode, event)

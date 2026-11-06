@@ -32,7 +32,10 @@ import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.MutableState
 import org.jellyfin.androidtv.R
+import org.jellyfin.androidtv.preference.constant.ZoomMode
+import org.jellyfin.playback.core.model.PlayerTrackType
 import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.ui.base.Icon
 import org.jellyfin.androidtv.ui.base.LocalTextStyle
@@ -62,6 +65,7 @@ private const val TICKS_PER_MILLISECOND = 10_000L
 fun VideoPlayerControls(
 	playbackManager: PlaybackManager = koinInject(),
 	onPlaybackInfoClick: () -> Unit = {},
+	zoom: MutableState<ZoomMode>? = null,
 ) {
 	val playState by playbackManager.state.playState.collectAsState()
 	val syncPlay = koinInject<SyncPlayClient>()
@@ -92,6 +96,11 @@ fun VideoPlayerControls(
 			Spacer(Modifier.weight(1f))
 
 			if (syncPlayAvailable) SyncPlayButton(syncPlayViewModel::show)
+
+			TrackButton(playbackManager, PlayerTrackType.SUBTITLE)
+			TrackButton(playbackManager, PlayerTrackType.AUDIO)
+			QualityButton(playbackManager)
+			if (zoom != null) ZoomButton(zoom)
 
 			PlaybackInfoButton(onClick = onPlaybackInfoClick)
 
@@ -131,6 +140,35 @@ private fun SyncPlayButton(onClick: () -> Unit) = IconButton(onClick = onClick) 
 	)
 }
 
+/** Play/pause that goes through the group when in SyncPlay; shared by the button and the remote's OK key. */
+@Composable
+fun rememberPlayPauseToggle(
+	playbackManager: PlaybackManager,
+	playState: PlayState = playbackManager.state.playState.collectAsState().value,
+	groupMember: Boolean? = null,
+	following: Boolean? = null,
+	syncPlay: SyncPlayClient = koinInject(),
+): () -> Unit {
+	val coroutineScope = rememberCoroutineScope()
+	val syncState by syncPlay.state.collectAsState()
+	val inGroup = groupMember ?: (syncState.group != null)
+	val isFollowing = following ?: syncState.following
+	return {
+		if (inGroup) {
+			coroutineScope.launch {
+				if (!isFollowing) syncPlay.resume()
+				else syncPlay.request(if (playState == PlayState.PLAYING) SyncPlayRequest.Pause else SyncPlayRequest.Unpause)
+			}
+		} else when (playState) {
+			PlayState.STOPPED,
+			PlayState.ERROR -> playbackManager.state.play()
+
+			PlayState.PLAYING -> playbackManager.state.pause()
+			PlayState.PAUSED -> playbackManager.state.unpause()
+		}
+	}
+}
+
 @Composable
 private fun PlayPauseButton(
 	playbackManager: PlaybackManager,
@@ -140,24 +178,9 @@ private fun PlayPauseButton(
 	syncPlay: SyncPlayClient,
 ) {
 	val focusRequester = remember { FocusRequester() }
-	val coroutineScope = rememberCoroutineScope()
+	val togglePlayPause = rememberPlayPauseToggle(playbackManager, playState, groupMember, following, syncPlay)
 	IconButton(
-		onClick = {
-			if (groupMember) {
-				coroutineScope.launch {
-					if (!following) syncPlay.resume()
-					else syncPlay.request(if (playState == PlayState.PLAYING) SyncPlayRequest.Pause else SyncPlayRequest.Unpause)
-				}
-				return@IconButton
-			}
-			when (playState) {
-				PlayState.STOPPED,
-				PlayState.ERROR -> playbackManager.state.play()
-
-				PlayState.PLAYING -> playbackManager.state.pause()
-				PlayState.PAUSED -> playbackManager.state.unpause()
-			}
-		},
+		onClick = togglePlayPause,
 		modifier = Modifier
 			.focusRequester(focusRequester)
 			.onVisibilityChanged {

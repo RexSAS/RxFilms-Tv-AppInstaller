@@ -8,6 +8,8 @@ import org.jellyfin.playback.core.backend.PlayerBackendEventListener
 import org.jellyfin.playback.core.mediastream.PlayableMediaStream
 import org.jellyfin.playback.core.model.PlayState
 import org.jellyfin.playback.core.model.PlaybackOrder
+import org.jellyfin.playback.core.model.PlayerTrack
+import org.jellyfin.playback.core.model.PlayerTrackType
 import org.jellyfin.playback.core.model.PositionInfo
 import org.jellyfin.playback.core.model.RepeatMode
 import org.jellyfin.playback.core.model.VideoSize
@@ -53,6 +55,11 @@ interface PlayerState {
 	fun setPlaybackOrder(order: PlaybackOrder)
 
 	fun setRepeatMode(mode: RepeatMode)
+
+	// Tracks
+
+	fun getTracks(type: PlayerTrackType): List<PlayerTrack>
+	fun selectTrack(type: PlayerTrackType, id: String?)
 }
 
 class MutablePlayerState(
@@ -156,5 +163,11 @@ class MutablePlayerState(
 
 	override fun setRepeatMode(mode: RepeatMode) {
 		_repeatMode.value = mode
+	}
+
+	override fun getTracks(type: PlayerTrackType): List<PlayerTrack> = backendService.backend?.getTracks(type).orEmpty()
+
+	override fun selectTrack(type: PlayerTrackType, id: String?) {
+		backendService.backend?.selectTrack(type, id)
 	}
 }
