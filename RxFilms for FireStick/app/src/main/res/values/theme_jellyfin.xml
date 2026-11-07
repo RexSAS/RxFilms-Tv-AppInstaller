@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
+    <!-- Only for the system's starting window, so the app opens straight onto the RxFilms splash. -->
+    <style name="Theme.Jellyfin.Launch" parent="Theme.Jellyfin">
+        <item name="android:windowBackground">@drawable/splash_window</item>
+    </style>
+
     <style name="Theme.Jellyfin" parent="@style/Theme.AppCompat.Leanback">
         <!-- Colors -->
         <item name="android:colorPrimary">@color/grey</item>

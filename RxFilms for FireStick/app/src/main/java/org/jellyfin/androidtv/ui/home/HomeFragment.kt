@@ -7,18 +7,9 @@ import android.view.ViewGroup
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.focusGroup
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import org.jellyfin.androidtv.R
-import org.jellyfin.androidtv.ui.base.CircularProgressIndicator
+import org.jellyfin.androidtv.ui.startup.fragment.RxFilmsSplash
 import kotlin.time.Duration.Companion.seconds
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -144,22 +135,7 @@ class HomeFragment : Fragment() {
 			}
 
 			AnimatedVisibility(visible = loading, enter = EnterTransition.None, exit = fadeOut()) {
-				Box(
-					contentAlignment = Alignment.Center,
-					modifier = Modifier
-						.fillMaxSize()
-						.background(Color.Black),
-				) {
-					Column(horizontalAlignment = Alignment.CenterHorizontally) {
-						Image(
-							painter = painterResource(R.drawable.app_logo),
-							contentDescription = null,
-							modifier = Modifier.height(120.dp),
-						)
-						Spacer(Modifier.height(32.dp))
-						CircularProgressIndicator(color = Color.White, modifier = Modifier.size(40.dp))
-					}
-				}
+				RxFilmsSplash()
 			}
 		}
 	}

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- First frame while the app starts: same black screen and centered logo as RxFilmsSplash. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@android:color/black" />
+    <item
+        android:width="420dp"
+        android:height="120dp"
+        android:drawable="@drawable/app_logo"
+        android:gravity="center" />
+</layer-list>

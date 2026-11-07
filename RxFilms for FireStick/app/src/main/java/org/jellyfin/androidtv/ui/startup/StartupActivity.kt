@@ -94,6 +94,8 @@ class StartupActivity : FragmentActivity() {
 		applyTheme()
 
 		super.onCreate(savedInstanceState)
+		// The launch theme's logo background is only for the starting window; the screens draw their own.
+		window.setBackgroundDrawableResource(android.R.color.black)
 
 		binding = ActivityStartupBinding.inflate(layoutInflater)
 		binding.background.setContent { AppBackground() }
@@ -193,6 +195,9 @@ class StartupActivity : FragmentActivity() {
 		intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_TASK_ON_HOME)
 		Timber.i("Opening next activity $intent")
 		startActivity(intent)
+		// Both screens show the same splash; no slide or flash between them.
+		@Suppress("DEPRECATION")
+		overridePendingTransition(0, 0)
 		finishAfterTransition()
 	}
 

@@ -5,9 +5,10 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -22,7 +23,8 @@ import androidx.fragment.compose.content
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.auth.repository.ServerRepository
 import org.jellyfin.androidtv.data.service.BackgroundService
-import org.jellyfin.androidtv.ui.background.AppBackground
+import androidx.compose.ui.graphics.Color
+import org.jellyfin.androidtv.ui.base.CircularProgressIndicator
 import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.koin.compose.koinInject
 
@@ -37,21 +39,28 @@ fun SplashScreen() {
 		else backgroundService.clearBackgrounds()
 	}
 
-	AppBackground()
+	RxFilmsSplash()
+}
 
-	Box(
+/** Black screen, centered logo and a spinner below it; matches the launch window (splash_window.xml) so the start is seamless. */
+@Composable
+fun RxFilmsSplash() = Box(
+	modifier = Modifier
+		.fillMaxSize()
+		.background(Color.Black),
+	contentAlignment = Alignment.Center,
+) {
+	Image(
+		painter = painterResource(R.drawable.app_logo),
+		contentDescription = stringResource(R.string.app_name),
+		modifier = Modifier.size(420.dp, 120.dp),
+	)
+	CircularProgressIndicator(
+		color = Color.White,
 		modifier = Modifier
-			.fillMaxSize(),
-		contentAlignment = Alignment.Center,
-	) {
-		Image(
-			painter = painterResource(R.drawable.app_logo),
-			contentDescription = stringResource(R.string.app_name),
-			modifier = Modifier
-				.width(400.dp)
-				.fillMaxHeight(),
-		)
-	}
+			.offset(y = 112.dp)
+			.size(40.dp),
+	)
 }
 
 class SplashFragment : Fragment() {

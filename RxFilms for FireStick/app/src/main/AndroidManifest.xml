@@ -119,6 +119,7 @@
         <activity
             android:name=".ui.startup.StartupActivity"
             android:banner="@drawable/app_banner_tv"
+            android:theme="@style/Theme.Jellyfin.Launch"
             android:exported="true"
             android:launchMode="singleTask"
             android:noHistory="true"
