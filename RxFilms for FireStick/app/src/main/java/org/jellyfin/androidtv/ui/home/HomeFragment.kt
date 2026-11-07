@@ -48,8 +48,8 @@ import org.jellyfin.androidtv.ui.shared.toolbar.MainToolbar
 import org.jellyfin.androidtv.ui.shared.toolbar.MainToolbarActiveButton
 import org.koin.android.ext.android.inject
 
-/** Once per app start: coming back to home from another screen doesn't show the loading screen again. */
-private var splashShown = false
+/** Set on every app launch (StartupActivity), cleared once the home has loaded: going back to home inside the app skips it. */
+var showHomeSplash = true
 
 class HomeFragment : Fragment() {
 	private val sessionRepository by inject<SessionRepository>()
@@ -73,14 +73,14 @@ class HomeFragment : Fragment() {
 		LaunchedEffect(rowsFocusRequester) { rowsFocusRequester.requestFocus() }
 
 		// Loading screen on app start, so the home doesn't show bare titles while rows and posters download.
-		var loading by remember { mutableStateOf(!splashShown) }
+		var loading by remember { mutableStateOf(showHomeSplash) }
 		var rowsAdded by remember { mutableStateOf(false) }
 		LaunchedEffect(rowsAdded) {
 			if (!loading) return@LaunchedEffect
 			// Once the rows and the media bar picture are in, give the posters a moment; never wait forever.
 			delay(if (rowsAdded) 0.7.seconds else 10.seconds)
 			loading = false
-			splashShown = true
+			showHomeSplash = false
 		}
 
 		// The rows fill the whole screen so the media bar can sit behind the toolbar; the toolbar gets a shadow to stay readable.

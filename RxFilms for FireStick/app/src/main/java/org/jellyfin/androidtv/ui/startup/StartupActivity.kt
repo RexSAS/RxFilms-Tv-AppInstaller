@@ -35,6 +35,7 @@ import org.jellyfin.androidtv.databinding.ActivityStartupBinding
 import org.jellyfin.androidtv.integration.LeanbackChannelWorker
 import org.jellyfin.androidtv.ui.background.AppBackground
 import org.jellyfin.androidtv.ui.browsing.MainActivity
+import org.jellyfin.androidtv.ui.home.showHomeSplash
 import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher
 import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
@@ -96,6 +97,8 @@ class StartupActivity : FragmentActivity() {
 		super.onCreate(savedInstanceState)
 		// The launch theme's logo background is only for the starting window; the screens draw their own.
 		window.setBackgroundDrawableResource(android.R.color.black)
+		// Every launch, including coming back from the TV's home, opens on the splash instead of a half-loaded home.
+		showHomeSplash = true
 
 		binding = ActivityStartupBinding.inflate(layoutInflater)
 		binding.background.setContent { AppBackground() }
