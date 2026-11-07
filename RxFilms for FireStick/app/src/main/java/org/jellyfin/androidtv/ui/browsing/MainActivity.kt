@@ -4,6 +4,14 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.fadeOut
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
+import org.jellyfin.androidtv.ui.home.showHomeSplash
+import org.jellyfin.androidtv.ui.startup.fragment.RxFilmsSplash
+import kotlin.time.Duration.Companion.seconds
 import org.jellyfin.androidtv.R
 import android.view.WindowManager
 import androidx.activity.compose.setContent
@@ -48,6 +56,8 @@ class MainActivity : FragmentActivity() {
 		applyTheme()
 
 		super.onCreate(savedInstanceState)
+		// The launch theme's logo is only for the starting window (no grey frame); the screens draw their own background.
+		window.setBackgroundDrawableResource(android.R.color.black)
 
 		if (!validateAuthentication()) return
 
@@ -79,6 +89,16 @@ class MainActivity : FragmentActivity() {
 					InAppScreensaver()
 					MainActivitySettings()
 					SyncPlayDialog()
+					AnimatedVisibility(visible = showHomeSplash, enter = EnterTransition.None, exit = fadeOut()) {
+						RxFilmsSplash()
+					}
+					// Safety net: never leave the splash up if the home doesn't report back.
+					LaunchedEffect(showHomeSplash) {
+						if (showHomeSplash) {
+							delay(12.seconds)
+							showHomeSplash = false
+						}
+					}
 				}
 			}
 		}

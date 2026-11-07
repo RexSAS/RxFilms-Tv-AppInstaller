@@ -4,12 +4,8 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.focusGroup
 import kotlinx.coroutines.delay
-import org.jellyfin.androidtv.ui.startup.fragment.RxFilmsSplash
 import kotlin.time.Duration.Companion.seconds
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -48,8 +44,11 @@ import org.jellyfin.androidtv.ui.shared.toolbar.MainToolbar
 import org.jellyfin.androidtv.ui.shared.toolbar.MainToolbarActiveButton
 import org.koin.android.ext.android.inject
 
-/** Set on every app launch (StartupActivity), cleared once the home has loaded: going back to home inside the app skips it. */
-var showHomeSplash = true
+/**
+ * Splash drawn by MainActivity over everything, so nothing grey shows before the home exists. Set by StartupActivity on
+ * every launch to the home, cleared here once the home has loaded: going back to home inside the app skips it.
+ */
+var showHomeSplash by mutableStateOf(true)
 
 class HomeFragment : Fragment() {
 	private val sessionRepository by inject<SessionRepository>()
@@ -73,13 +72,11 @@ class HomeFragment : Fragment() {
 		LaunchedEffect(rowsFocusRequester) { rowsFocusRequester.requestFocus() }
 
 		// Loading screen on app start, so the home doesn't show bare titles while rows and posters download.
-		var loading by remember { mutableStateOf(showHomeSplash) }
 		var rowsAdded by remember { mutableStateOf(false) }
 		LaunchedEffect(rowsAdded) {
-			if (!loading) return@LaunchedEffect
+			if (!showHomeSplash) return@LaunchedEffect
 			// Once the rows and the media bar picture are in, give the posters a moment; never wait forever.
 			delay(if (rowsAdded) 0.7.seconds else 10.seconds)
-			loading = false
 			showHomeSplash = false
 		}
 
@@ -132,10 +129,6 @@ class HomeFragment : Fragment() {
 					}
 			) {
 				MainToolbar(MainToolbarActiveButton.Home, homeFocusRequester = toolbarFocusRequester)
-			}
-
-			AnimatedVisibility(visible = loading, enter = EnterTransition.None, exit = fadeOut()) {
-				RxFilmsSplash()
 			}
 		}
 	}

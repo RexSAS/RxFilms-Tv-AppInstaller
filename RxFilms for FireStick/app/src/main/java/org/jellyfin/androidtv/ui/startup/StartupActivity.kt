@@ -97,8 +97,6 @@ class StartupActivity : FragmentActivity() {
 		super.onCreate(savedInstanceState)
 		// The launch theme's logo background is only for the starting window; the screens draw their own.
 		window.setBackgroundDrawableResource(android.R.color.black)
-		// Every launch, including coming back from the TV's home, opens on the splash instead of a half-loaded home.
-		showHomeSplash = true
 
 		binding = ActivityStartupBinding.inflate(layoutInflater)
 		binding.background.setContent { AppBackground() }
@@ -192,6 +190,8 @@ class StartupActivity : FragmentActivity() {
 		}
 
 		navigationRepository.reset(destination, true)
+		// Every launch to the home, including coming back from the TV's home, opens on the splash, not a half-loaded home.
+		showHomeSplash = destination == null
 
 		val intent = Intent(this, MainActivity::class.java)
 		// Clear navigation history
