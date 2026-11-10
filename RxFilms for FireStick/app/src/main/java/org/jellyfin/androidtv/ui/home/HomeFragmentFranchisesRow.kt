@@ -8,6 +8,7 @@ import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
+import android.widget.TextView
 import androidx.leanback.widget.HeaderItem
 import androidx.leanback.widget.ListRow
 import androidx.leanback.widget.OnItemViewClickedListener
@@ -26,29 +27,36 @@ import org.jellyfin.androidtv.ui.presentation.CardPresenter
 import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter
 import org.jellyfin.androidtv.util.dp
 import org.jellyfin.sdk.api.client.ApiClient
+import org.jellyfin.sdk.api.client.extensions.genresApi
 import org.jellyfin.sdk.api.client.extensions.studiosApi
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.SortOrder
 import org.jellyfin.sdk.model.api.request.GetItemsRequest
+import java.util.UUID
 
-/** [tags] are Jellyfin studio names; [logoPadding] shrinks for logos that need to be drawn larger. */
+/**
+ * [tags] are Jellyfin studio names; [logoPadding] shrinks for logos that need to be drawn larger.
+ * A genre tile has a [genreId] and no [logo]: its name is drawn instead.
+ */
 data class Franchise(
 	val name: String,
 	val tags: List<String>,
 	val colors: IntArray,
-	val logo: String,
+	val logo: String?,
+	val genreId: UUID? = null,
 	val invert: Boolean = false,
 	val logoPadding: Int = 24,
 )
 
 /**
- * Logo cards per franchise (port of the RxFilms web script). Selecting one opens a row with its titles,
- * newest first, right below; selecting it again closes it.
+ * Logo cards per franchise (port of the RxFilms web script), or with [genres] one card per server genre.
+ * Selecting one opens a row with its titles, newest first, right below; selecting it again closes it.
  */
 class HomeFragmentFranchisesRow(
 	private val scope: LifecycleCoroutineScope,
 	private val api: ApiClient,
+	private val genres: Boolean = false,
 ) : HomeFragmentRow, OnItemViewClickedListener {
 	private var context: Context? = null
 	private var cardPresenter: CardPresenter? = null
@@ -62,14 +70,24 @@ class HomeFragmentFranchisesRow(
 		this.cardPresenter = cardPresenter
 		this.rowsAdapter = rowsAdapter
 		val adapter = MutableObjectAdapter<Franchise>(FranchisePresenter())
-		FRANCHISES.forEach(adapter::add)
-		val row = ListRow(HeaderItem(context.getString(R.string.home_section_franchises)), adapter)
+		val title = if (genres) R.string.home_section_genres else R.string.home_section_franchises
+		val row = ListRow(HeaderItem(context.getString(title)), adapter)
 		franchiseRow = row
 		rowsAdapter.add(row)
+		if (!genres) FRANCHISES.forEach(adapter::add)
+		else scope.launch {
+			val items = withContext(Dispatchers.IO) {
+				runCatching { api.genresApi.getGenres(includeItemTypes = TYPES).content.items }.getOrDefault(emptyList())
+			}
+			if (items.isEmpty()) rowsAdapter.remove(row)
+			items.forEachIndexed { i, genre ->
+				adapter.add(Franchise(genre.name.orEmpty(), emptyList(), FRANCHISES[i % FRANCHISES.size].colors, null, genre.id))
+			}
+		}
 	}
 
 	override fun onItemClicked(itemViewHolder: Presenter.ViewHolder?, item: Any?, rowViewHolder: RowPresenter.ViewHolder?, row: Row?) {
-		if (item !is Franchise) return
+		if (item !is Franchise || row !== franchiseRow) return
 		val rowsAdapter = rowsAdapter ?: return
 		openRow?.let(rowsAdapter::remove)
 		openRow = null
@@ -80,16 +98,17 @@ class HomeFragmentFranchisesRow(
 		openFranchise = item
 
 		scope.launch {
-			val studioIds = withContext(Dispatchers.IO) {
+			val studioIds = if (item.genreId != null) emptyList() else withContext(Dispatchers.IO) {
 				// The SDK joins lists with commas but the server splits studio *names* on "|", so filter by id instead.
 				item.tags.mapNotNull { tag -> runCatching { api.studiosApi.getStudio(tag).content.id }.getOrNull() }
 			}
 			val context = context ?: return@launch
-			if (openFranchise != item || studioIds.isEmpty()) return@launch
+			if (openFranchise != item || (studioIds.isEmpty() && item.genreId == null)) return@launch
 
 			val query = GetItemsRequest(
-				studioIds = studioIds,
-				includeItemTypes = setOf(BaseItemKind.MOVIE, BaseItemKind.SERIES),
+				studioIds = studioIds.ifEmpty { null },
+				genreIds = item.genreId?.let(::setOf),
+				includeItemTypes = TYPES,
 				recursive = true,
 				sortBy = setOf(ItemSortBy.PREMIERE_DATE),
 				sortOrder = setOf(SortOrder.DESCENDING),
@@ -109,12 +128,20 @@ class HomeFragmentFranchisesRow(
 		override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
 			val background = GradientDrawable().apply { cornerRadius = 8.dp(parent.context).toFloat() }
 			val logo = AsyncImageView(parent.context).apply { scaleType = ImageView.ScaleType.FIT_CENTER }
+			val name = TextView(parent.context).apply {
+				gravity = Gravity.CENTER
+				setTextColor(Color.WHITE)
+				textSize = 20f
+				val padding = 12.dp(context)
+				setPadding(padding, padding, padding, padding)
+			}
 			val card = FrameLayout(parent.context).apply {
 				layoutParams = ViewGroup.LayoutParams(CARD_WIDTH.dp(context), CARD_HEIGHT.dp(context))
 				isFocusable = true
 				isFocusableInTouchMode = true
 				this.background = background
 				addView(logo, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER))
+				addView(name, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER))
 				setOnFocusChangeListener { _, focused -> background.setStroke(if (focused) 3.dp(context) else 0, Color.WHITE) }
 			}
 			return ViewHolder(card)
@@ -131,6 +158,7 @@ class HomeFragmentFranchisesRow(
 			franchise.logoPadding.dp(card.context).let { logo.setPadding(it, it, it, it) }
 			if (franchise.invert) logo.setColorFilter(Color.WHITE, PorterDuff.Mode.SRC_IN) else logo.clearColorFilter()
 			logo.contentDescription = franchise.name
+			(card.getChildAt(1) as TextView).text = if (franchise.logo == null) franchise.name else null
 			logo.load(url = franchise.logo)
 		}
 
@@ -139,6 +167,7 @@ class HomeFragmentFranchisesRow(
 
 	private companion object {
 		const val ITEM_CHUNK_SIZE = 50
+		val TYPES = setOf(BaseItemKind.MOVIE, BaseItemKind.SERIES)
 		const val CARD_WIDTH = 220
 		const val CARD_HEIGHT = 124
 

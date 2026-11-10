@@ -92,6 +92,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private val notificationsRow by lazy { NotificationsHomeFragmentRow(lifecycleScope, notificationsRepository) }
 	private val nowPlaying by lazy { HomeFragmentNowPlayingRow(lifecycleScope, playbackManager, mediaManager) }
 	private val franchisesRow by lazy { HomeFragmentFranchisesRow(lifecycleScope, api) }
+	private val genresRow by lazy { HomeFragmentFranchisesRow(lifecycleScope, api, genres = true) }
 	private val mediaBarRow by lazy { HomeFragmentMediaBarRow(lifecycleScope, api, navigationRepository) { onFocusToolbar() } }
 
 	/** Set by HomeFragment; moves focus to the toolbar drawn over these rows. */
@@ -116,7 +117,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 			// Start out with default sections
 			// The order is stored on the server and shared with Jellyfin web, so RxFilms' layout is enforced here:
-			// no "Because you watched" or genre rows, and Recently added right under Franchises.
+			// no "Because you watched" or random genre rows (Genres tiles sit under Franchises), and Recently added under them.
 			val homesections = userSettingPreferences.activeHomesections
 				.filterNot { it == HomeSectionType.BECAUSE_YOU_WATCHED || it == HomeSectionType.GENRES }
 				.let { sections ->
@@ -158,7 +159,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				}
 				HomeSectionType.BECAUSE_YOU_WATCHED -> rows.addAll(loadOptional { helper.loadBecauseYouWatched() })
 				HomeSectionType.GENRES -> rows.addAll(loadOptional { helper.loadGenres() })
-				HomeSectionType.FRANCHISES -> rows.add(franchisesRow)
+				HomeSectionType.FRANCHISES -> rows.addAll(listOf(franchisesRow, genresRow))
 
 				HomeSectionType.NONE -> Unit
 			}
@@ -192,6 +193,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			registerListener(ItemViewClickedListener())
 			registerListener(notificationsRow::onItemClicked)
 			registerListener(franchisesRow::onItemClicked)
+			registerListener(genresRow::onItemClicked)
 			registerListener(mediaBarRow::onItemClicked)
 		}
 
