@@ -407,6 +407,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
 
     protected void play(long position, @Nullable Integer forcedSubtitleIndex) {
         String forcedAudioLanguage = videoQueueManager.getValue().getLastPlayedAudioLanguageIsoCode();
+        if (forcedAudioLanguage == null) forcedAudioLanguage = DEFAULT_LANGUAGE;
         Timber.i("Play called from state: %s with pos: %d, sub index: %d and forced audio: %s", mPlaybackState, position, forcedSubtitleIndex, forcedAudioLanguage);
 
         if (mFragment == null) {
@@ -530,7 +531,11 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             internalOptions.setSubtitleStreamIndex(forcedSubtitleIndex);
         }
         MediaSourceInfo currentMediaSource = getCurrentMediaSource();
-        if (forcedAudioLanguage != null) {
+        if (internalOptions.getSubtitleStreamIndex() == null && videoQueueManager.getValue().getLastPlayedSubtitleLanguageIsoCode() == null) {
+            Integer forcedSub = defaultSubtitleIndex(currentMediaSource);
+            internalOptions.setSubtitleStreamIndex(forcedSub != null ? forcedSub : -1);
+        }
+        if (forcedAudioLanguage != null && currentMediaSource != null && currentMediaSource.getMediaStreams() != null) {
             // find the first audio stream with the requested language
             for (MediaStream stream : currentMediaSource.getMediaStreams()) {
                 if (stream.getType() == MediaStreamType.AUDIO && forcedAudioLanguage.equals(stream.getLanguage())) {
@@ -661,8 +666,8 @@ public class PlaybackController implements PlaybackControllerNotifiable {
                 mCurrentOptions.setSubtitleStreamIndex(matchingIndex);
             }
         } else {
-            // No saved preference, use server default
-            mCurrentOptions.setSubtitleStreamIndex(response.getMediaSource().getDefaultSubtitleStreamIndex());
+            // No saved preference: forced Italian subtitles, otherwise none
+            mCurrentOptions.setSubtitleStreamIndex(defaultSubtitleIndex(response.getMediaSource()));
         }
         setDefaultAudioIndex(response);
         Timber.i("default audio index set to %s remote default %s", mDefaultAudioIndex, response.getMediaSource().getDefaultAudioStreamIndex());
@@ -766,6 +771,18 @@ public class PlaybackController implements PlaybackControllerNotifiable {
                 )
                     return track.getIndex();
             }
+        }
+        return null;
+    }
+
+    private static final String DEFAULT_LANGUAGE = "ita";
+
+    @Nullable
+    private static Integer defaultSubtitleIndex(@Nullable MediaSourceInfo info) {
+        if (info == null || info.getMediaStreams() == null) return null;
+        for (MediaStream stream : info.getMediaStreams()) {
+            if (stream.getType() == MediaStreamType.SUBTITLE && stream.isForced() && DEFAULT_LANGUAGE.equals(stream.getLanguage()))
+                return stream.getIndex();
         }
         return null;
     }

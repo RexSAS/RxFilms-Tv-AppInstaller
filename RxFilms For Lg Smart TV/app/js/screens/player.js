@@ -81,8 +81,14 @@ function PlayerScreen(item, startSeconds, sync) {
 		return playbackInfo(start, directPlay).then(function (info) {
 			var source = info.MediaSources && info.MediaSources[0];
 			if (!source) throw new Error('No playable version');
-			if (state.audio == null) state.audio = source.DefaultAudioStreamIndex;
-			if (state.sub == null) state.sub = source.DefaultSubtitleStreamIndex != null ? source.DefaultSubtitleStreamIndex : -1;
+			// Defaults: Italian audio, forced Italian subtitles (none otherwise).
+			var streams = source.MediaStreams || [];
+			var ita = function (type, forced) { return streams.filter(function (s) { return s.Type === type && s.Language === 'ita' && (!forced || s.IsForced); })[0]; };
+			var pickedAudio = state.audio == null;
+			if (pickedAudio) state.audio = ita('Audio') ? ita('Audio').Index : source.DefaultAudioStreamIndex;
+			if (state.sub == null) state.sub = ita('Subtitle', true) ? ita('Subtitle', true).Index : -1;
+			// The server built this answer for its own default audio: ask again for the Italian one.
+			if (state.audio !== source.DefaultAudioStreamIndex && pickedAudio) return load(start, directPlay);
 			var stream = Logic.streamFor(Api.server, Api.token, item.Id, source, info.PlaySessionId, state.audio);
 			if (!stream) {
 				// Another audio track than the file's default: let the server remux it.
