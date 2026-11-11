@@ -39,6 +39,19 @@ class SyncPlayCoordinatorTests : FunSpec({
 		}
 	}
 
+	test("M04 create without a server socket fails with NO_CONNECTION and sends nothing") {
+		runTest {
+			val fixture = Fixture(this)
+			fixture.transport.connectionState.value = SocketApiState.Disconnected()
+			val create = async { fixture.coordinator.create("Room") }
+			advanceTimeBy(10_001) // join/create socket timeout
+			runCurrent()
+			create.await() shouldBe false
+			fixture.coordinator.state.value.error shouldBe SyncPlayFailure.NO_CONNECTION
+			fixture.transport.created shouldBe false
+		}
+	}
+
 	test("B01 loads paused and reports actual readiness before scheduled unpause") {
 		runTest {
 			val fixture = Fixture(this)
@@ -282,7 +295,8 @@ private class FakeSyncPlayTransport : SyncPlayTransport {
 	var failJoin = false
 	var joinCount = 0
 	override suspend fun groups() = listOf(group())
-	override suspend fun createGroup(name: String): GroupInfoDto = group()
+	var created = false
+	override suspend fun createGroup(name: String): GroupInfoDto = group().also { created = true }
 	override suspend fun joinGroup(id: UUID) {
 		joinCount++
 		joinedWithSubscriber = events.subscriptionCount.value > 0

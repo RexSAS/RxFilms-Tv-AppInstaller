@@ -731,6 +731,8 @@
     <string name="syncplay_error_membership">Couldn’t join or create the group.</string>
     <string name="syncplay_error_action">The SyncPlay action failed.</string>
     <string name="syncplay_error_disconnected">SyncPlay disconnected.</string>
+    <string name="syncplay_error_no_connection">Can’t reach the server’s live connection. Check this TV’s internet and try again.</string>
+    <string name="syncplay_error_not_allowed">This account isn’t allowed to use SyncPlay. Ask the server admin to enable it.</string>
     <string name="syncplay_error_playback">This item couldn’t be played with SyncPlay.</string>
     <string name="syncplay_error_group_missing">This SyncPlay group no longer exists.</string>
     <string name="syncplay_user_joined">%1$s joined the group</string>

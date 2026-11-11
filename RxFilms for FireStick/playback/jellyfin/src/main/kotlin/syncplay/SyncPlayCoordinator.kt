@@ -16,6 +16,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
+import org.jellyfin.sdk.api.client.exception.InvalidStatusException
 import org.jellyfin.sdk.api.sockets.SocketApiState
 import org.jellyfin.sdk.model.api.GroupInfoDto
 import org.jellyfin.sdk.model.api.PlayQueueUpdate
@@ -36,7 +38,7 @@ import java.util.UUID
 import kotlin.math.abs
 
 /** UI maps these causes to localized messages; server errors and credentials are never display text. */
-enum class SyncPlayFailure { REQUEST, DISCONNECTED, PLAYBACK, GROUP_MISSING, ACCESS_DENIED }
+enum class SyncPlayFailure { REQUEST, DISCONNECTED, NO_CONNECTION, NOT_ALLOWED, PLAYBACK, GROUP_MISSING, ACCESS_DENIED }
 
 data class SyncPlayStatus(
 	val group: GroupInfoDto? = null,
@@ -102,8 +104,13 @@ class SyncPlayCoordinator(
 			}
 		}
 		try {
+			// SyncPlay updates only arrive over the socket, so without it there is nothing to join or create.
+			if (withTimeoutOrNull(REQUEST_TIMEOUT_MILLIS) { transport.connectionState.first { it is SocketApiState.Connected } } == null) {
+				Timber.w("SyncPlay: no server socket after %d ms (%s)", REQUEST_TIMEOUT_MILLIS, transport.connectionState.value)
+				if (current(generation)) failSession(SyncPlayFailure.NO_CONNECTION)
+				return@withLock false
+			}
 			withTimeout(REQUEST_TIMEOUT_MILLIS) {
-				transport.connectionState.first { it is SocketApiState.Connected }
 				if (id == null) {
 					val created = transport.createGroup(requireNotNull(name))
 					if (current(generation)) onJoined(generation, created)
@@ -122,7 +129,8 @@ class SyncPlayCoordinator(
 			throw error
 		} catch (error: Exception) {
 			Timber.w(error, "SyncPlay: join/create failed")
-			if (current(generation)) failSession(SyncPlayFailure.REQUEST)
+			val denied = error is InvalidStatusException && (error.status == 401 || error.status == 403)
+			if (current(generation)) failSession(if (denied) SyncPlayFailure.NOT_ALLOWED else SyncPlayFailure.REQUEST)
 			false
 		}
 	}

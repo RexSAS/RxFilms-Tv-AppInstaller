@@ -71,7 +71,8 @@ fun SyncPlayDialog() {
 				)
 			}
 
-			val error = uiState.error?.let {
+			// The session's own failure says why a join/create failed; the generic membership error doesn't.
+			val error = uiState.error?.takeUnless { it == SyncPlayUiError.MEMBERSHIP && syncState.error != null }?.let {
 				when (it) {
 					SyncPlayUiError.GROUPS -> R.string.syncplay_error_groups
 					SyncPlayUiError.MEMBERSHIP -> R.string.syncplay_error_membership
@@ -81,6 +82,8 @@ fun SyncPlayDialog() {
 				when (it) {
 					SyncPlayFailure.REQUEST -> R.string.syncplay_error_action
 					SyncPlayFailure.DISCONNECTED -> R.string.syncplay_error_disconnected
+					SyncPlayFailure.NO_CONNECTION -> R.string.syncplay_error_no_connection
+					SyncPlayFailure.NOT_ALLOWED -> R.string.syncplay_error_not_allowed
 					SyncPlayFailure.PLAYBACK -> R.string.syncplay_error_playback
 					SyncPlayFailure.GROUP_MISSING -> R.string.syncplay_error_group_missing
 					SyncPlayFailure.ACCESS_DENIED -> R.string.syncplay_error_access_denied
