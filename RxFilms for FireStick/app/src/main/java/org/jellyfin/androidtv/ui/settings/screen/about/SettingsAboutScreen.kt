@@ -2,7 +2,10 @@ package org.jellyfin.androidtv.ui.settings.screen.about
 
 import android.content.ClipData
 import android.os.Build
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -17,6 +20,8 @@ import org.jellyfin.androidtv.ui.navigation.focus.focusKey
 import org.jellyfin.androidtv.ui.settings.Routes
 import org.jellyfin.androidtv.ui.settings.composable.SettingsColumn
 import org.jellyfin.androidtv.ui.settings.util.copyAction
+import org.jellyfin.androidtv.ui.update.AppUpdater
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsAboutScreen(launchedFromLogin: Boolean = false) {
@@ -44,6 +49,18 @@ fun SettingsAboutScreen(launchedFromLogin: Boolean = false) {
 				captionContent = { Text(caption) },
 				onClick = copyAction(ClipData.newPlainText(heading, caption)),
 				modifier = Modifier.focusKey("version")
+			)
+		}
+
+		if (!launchedFromLogin) item {
+			val activity = LocalActivity.current as? ComponentActivity
+			val scope = rememberCoroutineScope()
+			ListButton(
+				leadingContent = { Icon(painterResource(R.drawable.ic_loop), contentDescription = null) },
+				headingContent = { Text(stringResource(R.string.update_check)) },
+				captionContent = { Text("RxFilms ${BuildConfig.VERSION_NAME}") },
+				onClick = { activity?.let { scope.launch { AppUpdater.check(it, manual = true) } } },
+				modifier = Modifier.focusKey("check_updates")
 			)
 		}
 

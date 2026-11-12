@@ -14,6 +14,7 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import android.widget.Toast
 import androidx.core.content.FileProvider
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
@@ -45,20 +46,25 @@ object AppUpdater {
 	private var downloaded: File? = null
 	private var screen: UpdateScreen? = null
 
-	suspend fun <T> check(activity: T) where T : Activity, T : LifecycleOwner {
+	/** At startup once per run; [manual] ("Check for updates" in Settings) also reports when there's nothing new. */
+	suspend fun <T> check(activity: T, manual: Boolean = false) where T : Activity, T : LifecycleOwner {
+		val tell = { message: String -> if (manual) Toast.makeText(activity, message, Toast.LENGTH_LONG).show() }
 		// Debug builds have their own package and "dev" versions; only release builds can update themselves.
-		if (BuildConfig.DEBUG || offered) return
+		if (BuildConfig.DEBUG) return tell(activity.getString(R.string.update_debug_build))
+		if (offered && !manual) return
 
 		val release = withContext(Dispatchers.IO) {
 			runCatching { JSONObject(URL(LATEST_RELEASE).readText()) }.onFailure { Timber.w(it, "Update check failed") }.getOrNull()
-		} ?: return
+		} ?: return tell(activity.getString(R.string.update_check_failed))
 		val latest = release.optString("tag_name").removePrefix("v")
-		if (!isNewerVersion(latest, BuildConfig.VERSION_NAME)) return
+		if (!isNewerVersion(latest, BuildConfig.VERSION_NAME)) {
+			return tell(activity.getString(R.string.update_up_to_date, BuildConfig.VERSION_NAME))
+		}
 		val assets = release.getJSONArray("assets")
 		val url = (0 until assets.length()).map(assets::getJSONObject)
 			.firstOrNull { it.getString("name").startsWith(TV_ASSET_PREFIX) && it.getString("name").endsWith(".apk") }
 			?.getString("browser_download_url") ?: return
-		if (activity.isFinishing || offered) return
+		if (activity.isFinishing || (offered && !manual)) return
 		offered = true
 
 		AlertDialog.Builder(activity)

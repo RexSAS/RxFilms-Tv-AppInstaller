@@ -452,6 +452,10 @@
     <string name="update_progress">%1$d%% · %2$s of %3$s</string>
     <string name="update_required_message">RxFilms %1$s is available (you have %2$s). Install it to keep using RxFilms.</string>
     <string name="update_retry">Retry</string>
+    <string name="update_check">Check for updates</string>
+    <string name="update_up_to_date">RxFilms is up to date (%1$s)</string>
+    <string name="update_check_failed">Couldn\'t check for updates</string>
+    <string name="update_debug_build">Debug builds don\'t update themselves</string>
     <string name="update_install_waiting">Install the update to keep using RxFilms</string>
     <string name="update_allow_install">To update, RxFilms needs permission to install apps. Go to Settings → My Fire TV → Developer options → Install unknown apps → RxFilms and turn it on, then come back to RxFilms: the update starts by itself.</string>
     <string name="update_open_settings">Open settings</string>
