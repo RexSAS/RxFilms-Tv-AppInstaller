@@ -19,8 +19,12 @@ data class SyncPlaySessionState(
 	val currentItem get() = queue?.let { it.playlist.getOrNull(it.playingItemIndex) }
 
 	// Retain commands that arrive before their queue, but never apply them to another occurrence.
+	// The server sends Stop on create/join; a queue set after it must still load, so an older Stop is dropped.
 	val playbackCommand: SendCommand?
-		get() = command?.takeIf { it.command == SendCommandType.STOP || it.playlistItemId == currentItem?.playlistItemId }
+		get() = command?.takeIf {
+			if (it.command == SendCommandType.STOP) queue?.let { queue -> it.emittedAt >= queue.lastUpdate } ?: true
+			else it.playlistItemId == currentItem?.playlistItemId
+		}
 }
 
 /**
@@ -46,6 +50,14 @@ class SyncPlaySession {
 		if (current.group != null) return current.group.groupId == group.groupId
 		if (!current.joining || (expectedGroupId != null && expectedGroupId != group.groupId)) return false
 		mutableState.value = current.copy(joining = false, group = group.copy(participants = group.participants.toList()))
+		return true
+	}
+
+	/** Changes the joined group's info (members, state) here, the one copy [SyncPlayCoordinator] publishes from. */
+	fun updateGroup(generation: Long, groupId: UUID, transform: (GroupInfoDto) -> GroupInfoDto): Boolean {
+		if (!owns(generation, groupId)) return false
+		val current = mutableState.value
+		mutableState.value = current.copy(group = transform(requireNotNull(current.group)))
 		return true
 	}
 

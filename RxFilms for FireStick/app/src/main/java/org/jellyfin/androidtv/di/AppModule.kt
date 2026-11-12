@@ -58,6 +58,7 @@ import org.jellyfin.androidtv.ui.settings.compat.SettingsViewModel
 import org.jellyfin.androidtv.ui.settings.screen.library.SettingsLibrariesScreenViewModel
 import org.jellyfin.androidtv.ui.syncplay.CoreSyncPlayPlayer
 import org.jellyfin.androidtv.ui.syncplay.SyncPlayMediaSessionInterceptor
+import org.jellyfin.androidtv.ui.syncplay.SyncPlaySeeker
 import org.jellyfin.androidtv.ui.syncplay.SyncPlayViewModel
 import org.jellyfin.androidtv.ui.startup.ServerAddViewModel
 import org.jellyfin.androidtv.ui.startup.StartupViewModel
@@ -69,6 +70,7 @@ import org.jellyfin.androidtv.util.PlaybackHelper
 import org.jellyfin.androidtv.util.apiclient.ReportingHelper
 import org.jellyfin.androidtv.util.coil.CoilTimberLogger
 import org.jellyfin.androidtv.util.sdk.LosslessSocketConnectionFactory
+import org.jellyfin.androidtv.util.sdk.ReliableApiClientFactory
 import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.androidtv.util.coil.createCoilConnectivityChecker
 import org.jellyfin.androidtv.util.sdk.SdkPlaybackHelper
@@ -110,7 +112,7 @@ val appModule = module {
 			minimumServerVersion = ServerRepository.minimumServerVersion
 
 			// Use our own shared factory instance
-			apiClientFactory = get<OkHttpFactory>()
+			apiClientFactory = ReliableApiClientFactory(get<OkHttpFactory>())
 			socketConnectionFactory = LosslessSocketConnectionFactory(get())
 		}
 	}
@@ -131,9 +133,15 @@ val appModule = module {
 			monotonicMillis = SystemClock::elapsedRealtime,
 		).also { coordinator ->
 			coordinator.attach(get<CoreSyncPlayPlayer>())
-			get<PlaybackManager>().commandInterceptor = SyncPlayMediaSessionInterceptor(coordinator, scope)
+			get<PlaybackManager>().commandInterceptor = SyncPlayMediaSessionInterceptor(coordinator, scope) { position ->
+				get<SyncPlaySeeker>().seek(position)
+			}
 		}
 	} bind SyncPlayClient::class
+	single {
+		val playbackManager = get<PlaybackManager>()
+		SyncPlaySeeker(get(), { position -> playbackManager.state.seek(position) }, ProcessLifecycleOwner.get().lifecycleScope)
+	}
 	single<SessionCleanup> {
 		// Session changes run on IO; the coordinator and ExoPlayer must only be touched on Main.
 		SessionCleanup {

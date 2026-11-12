@@ -44,6 +44,7 @@ import org.jellyfin.androidtv.ui.base.button.IconButton
 import org.jellyfin.androidtv.ui.base.popover.Popover
 import org.jellyfin.androidtv.ui.composable.rememberPlayerPositionInfo
 import org.jellyfin.androidtv.ui.player.base.PlayerSeekbar
+import org.jellyfin.androidtv.ui.syncplay.SyncPlaySeeker
 import org.jellyfin.androidtv.ui.syncplay.SyncPlayViewModel
 import org.jellyfin.androidtv.util.getTimeFormatter
 import org.jellyfin.playback.core.PlaybackManager
@@ -69,6 +70,7 @@ fun VideoPlayerControls(
 ) {
 	val playState by playbackManager.state.playState.collectAsState()
 	val syncPlay = koinInject<SyncPlayClient>()
+	val seeker = koinInject<SyncPlaySeeker>()
 	val userRepository = koinInject<UserRepository>()
 	val syncPlayViewModel = koinActivityViewModel<SyncPlayViewModel>()
 	val currentUser by userRepository.currentUser.collectAsState()
@@ -116,9 +118,7 @@ fun VideoPlayerControls(
 				.fillMaxWidth()
 				.height(4.dp),
 			enabled = !groupMember || following,
-			onSeek = if (!groupMember) null else { position ->
-				coroutineScope.launch { syncPlay.request(SyncPlayRequest.Seek(position.inWholeMilliseconds * TICKS_PER_MILLISECOND)) }
-			},
+			onSeek = if (!groupMember) null else seeker::seek,
 		)
 
 		Row(
@@ -216,15 +216,12 @@ private fun RewindButton(
 	following: Boolean,
 	syncPlay: SyncPlayClient,
 ) {
-	val coroutineScope = rememberCoroutineScope()
+	val seeker = koinInject<SyncPlaySeeker>()
 	IconButton(
 		enabled = !groupMember || following,
 		onClick = {
 			if (groupMember) {
-				val target = playbackManager.state.positionInfo.active - playbackManager.options.defaultRewindAmount()
-				coroutineScope.launch {
-					syncPlay.request(SyncPlayRequest.Seek(target.inWholeMilliseconds.coerceAtLeast(0) * TICKS_PER_MILLISECOND))
-				}
+				seeker.seek(playbackManager.state.positionInfo.active - playbackManager.options.defaultRewindAmount())
 			} else playbackManager.state.rewind()
 		},
 	) {
@@ -242,15 +239,12 @@ private fun FastForwardButton(
 	following: Boolean,
 	syncPlay: SyncPlayClient,
 ) {
-	val coroutineScope = rememberCoroutineScope()
+	val seeker = koinInject<SyncPlaySeeker>()
 	IconButton(
 		enabled = !groupMember || following,
 		onClick = {
 			if (groupMember) {
-				val target = playbackManager.state.positionInfo.active + playbackManager.options.defaultFastForwardAmount()
-				coroutineScope.launch {
-					syncPlay.request(SyncPlayRequest.Seek(target.inWholeMilliseconds * TICKS_PER_MILLISECOND))
-				}
+				seeker.seek(playbackManager.state.positionInfo.active + playbackManager.options.defaultFastForwardAmount())
 			} else playbackManager.state.fastForward()
 		},
 	) {

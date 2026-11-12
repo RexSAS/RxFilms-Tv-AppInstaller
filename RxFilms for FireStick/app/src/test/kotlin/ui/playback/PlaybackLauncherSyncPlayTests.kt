@@ -41,7 +41,10 @@ class PlaybackLauncherSyncPlayTests : FunSpec({
 			launcher.launch(mockk<Context>(relaxed = true), items, position = 1234, itemsPosition = 1)
 			advanceUntilIdle()
 
-			val request = syncPlay.requests.single() as SyncPlayRequest.SetQueue
+			// Not following (e.g. after Back): ask the server to wait for this TV before it gets the new queue.
+			syncPlay.requests.first() shouldBe SyncPlayRequest.IgnoreWait(false)
+			val request = syncPlay.requests.last() as SyncPlayRequest.SetQueue
+			syncPlay.requests.size shouldBe 2
 			request.data.playingQueue shouldBe listOf(firstId, secondId)
 			request.data.playingItemPosition shouldBe 1
 			request.data.startPositionTicks shouldBe 12_340_000L

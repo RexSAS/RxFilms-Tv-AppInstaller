@@ -40,6 +40,11 @@ private class LosslessSocketConnection(private val client: OkHttpClient) : Socke
 			mutableState.update(SocketConnectionState.Message(text))
 		}
 
+		// The server started a clean close: answer it so OkHttp reports onClosed instead of waiting for a timeout.
+		override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+			webSocket.close(code, null)
+		}
+
 		// A null field also matches: OkHttp may fail before newWebSocket() returns, and connect() would wait forever.
 		override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
 			if (this@LosslessSocketConnection.webSocket.let { it == null || it == webSocket }) {

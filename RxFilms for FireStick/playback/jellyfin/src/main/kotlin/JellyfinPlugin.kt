@@ -16,6 +16,8 @@ fun jellyfinPlugin(
 	deviceProfileBuilder: () -> DeviceProfile,
 	mediaSegmentSkipTypes: Set<MediaSegmentType> = emptySet(),
 	lifecycle: Lifecycle? = null,
+	// False only loads the segments onto the queue entries, for a skip button in the UI.
+	mediaSegmentAutoSkip: Boolean = true,
 ) = playbackPlugin {
 	provide(JellyfinMediaStreamResolver(api, deviceProfileBuilder))
 
@@ -25,5 +27,5 @@ fun jellyfinPlugin(
 
 	provide(LyricsPlayerService(api))
 
-	if (mediaSegmentSkipTypes.isNotEmpty()) provide(MediaSegmentService(api, mediaSegmentSkipTypes))
+	if (mediaSegmentSkipTypes.isNotEmpty()) provide(MediaSegmentService(api, mediaSegmentSkipTypes, mediaSegmentAutoSkip))
 }

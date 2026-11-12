@@ -96,7 +96,8 @@ var SyncPlay = {
 		Api.get('/GetUtcTime').then(function (time) {
 			var received = Date.now();
 			self.offset = ((Date.parse(time.RequestReceptionTime) - sent) + (Date.parse(time.ResponseTransmissionTime) - received)) / 2;
-			self.request('Ping', { Ping: received - sent });
+			// Jellyfin (like its web client) expects the one-way delay, not the round trip.
+			self.request('Ping', { Ping: Math.round((received - sent) / 2) });
 		}).catch(function () {});
 	},
 

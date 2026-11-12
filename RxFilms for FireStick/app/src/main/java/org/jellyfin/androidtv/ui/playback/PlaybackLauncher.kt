@@ -56,6 +56,9 @@ class PlaybackLauncher(
 		if (items.isEmpty()) return
 		if (syncPlay.state.value.group != null) {
 			coroutineScope.launch {
+				// Make the server wait for this TV again before it builds the new queue. Not resume(): that would
+				// first reload the old title; the new queue makes the coordinator follow again (and load it) anyway.
+				if (!syncPlay.state.value.following) syncPlay.request(SyncPlayRequest.IgnoreWait(false))
 				syncPlay.request(
 					SyncPlayRequest.SetQueue(
 						PlayRequestDto(

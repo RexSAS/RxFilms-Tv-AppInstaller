@@ -21,6 +21,7 @@ import org.jellyfin.sdk.api.client.exception.InvalidStatusException
 import org.jellyfin.sdk.api.sockets.SocketApiState
 import org.jellyfin.sdk.model.api.GroupInfoDto
 import org.jellyfin.sdk.model.api.PlayQueueUpdate
+import org.jellyfin.sdk.model.api.PlayQueueUpdateReason
 import org.jellyfin.sdk.model.api.SendCommandType
 import org.jellyfin.sdk.model.api.SyncPlayGroupDoesNotExistUpdate
 import org.jellyfin.sdk.model.api.SyncPlayGroupJoinedUpdate
@@ -73,6 +74,8 @@ class SyncPlayCoordinator(
 	private var loadingItem: UUID? = null
 	private var endedItem: UUID? = null
 	private var messagesJob: Job? = null
+	private var warmJob: Job? = null
+	private var leaveJob: Job? = null
 	private var connectionJob: Job? = null
 	private var clockJob: Job? = null
 	private var prepareJob: Job? = null
@@ -82,7 +85,30 @@ class SyncPlayCoordinator(
 	private var bufferingReportedItem: UUID? = null
 	private val scheduler = SyncPlayCommandScheduler(scope, { clock.serverTime(monotonicMillis()) }, ::applyAction)
 
-	override suspend fun groups(): List<GroupInfoDto> = transport.groups()
+	override suspend fun groups(): List<GroupInfoDto> = transport.groups().also(::updateMembers)
+
+	/** The server only names the members in group listings; keep ours current from any listing. */
+	private fun updateMembers(groups: List<GroupInfoDto>) {
+		val generation = session.state.value.generation
+		val listed = groups.firstOrNull { it.groupId == state.value.group?.groupId } ?: return
+		// Only the members: lastUpdatedAt still has to filter commands older than our join.
+		if (session.updateGroup(generation, listed.groupId) { it.copy(participants = listed.participants.toList()) }) publish()
+	}
+
+	// The SDK only opens its socket while something subscribes; a short throwaway subscription starts the connection
+	// while the user is still choosing, so Create/Join don't have to wait for it.
+	override fun warmUp() {
+		if (messagesJob?.isActive == true || warmJob?.isActive == true) return
+		warmJob = scope.launch {
+			try {
+				withTimeoutOrNull(WARM_UP_MILLIS) { transport.events.collect { } }
+			} catch (error: CancellationException) {
+				throw error
+			} catch (error: Exception) {
+				Timber.w(error, "SyncPlay: socket warm-up failed")
+			}
+		}
+	}
 
 	override suspend fun create(name: String): Boolean = joinOrCreate(null, name)
 	override suspend fun join(id: UUID): Boolean = joinOrCreate(id, null)
@@ -90,6 +116,8 @@ class SyncPlayCoordinator(
 	@Suppress("CyclomaticComplexMethod") // Every asynchronous boundary revalidates the membership generation.
 	private suspend fun joinOrCreate(id: UUID?, name: String?): Boolean = membershipMutex.withLock {
 		if (state.value.group != null || state.value.joining) return@withLock false
+		// A leave still sent for an earlier failure must not land after this join and drop us again.
+		leaveJob?.join()
 		reset(stopPlayer = false)
 		val generation = session.beginJoin(id)
 		mutableState.value = SyncPlayStatus(joining = true, following = true)
@@ -117,12 +145,9 @@ class SyncPlayCoordinator(
 				} else transport.joinGroup(id)
 				state.first { !it.joining }
 			}
-			if (!current(generation) || state.value.group == null) return@withLock false
-			connectionJob = scope.launch {
-				transport.connectionState.collect { connection ->
-					if (current(generation) && connection !is SocketApiState.Connected) failSession(SyncPlayFailure.DISCONNECTED)
-				}
-			}
+			val groupId = state.value.group?.groupId
+			if (!current(generation) || groupId == null) return@withLock false
+			connectionJob = scope.launch { followConnection(generation, groupId) }
 			true
 		} catch (error: CancellationException) {
 			if (current(generation)) failSession(SyncPlayFailure.REQUEST)
@@ -132,6 +157,32 @@ class SyncPlayCoordinator(
 			val denied = error is InvalidStatusException && (error.status == 401 || error.status == 403)
 			if (current(generation)) failSession(if (denied) SyncPlayFailure.NOT_ALLOWED else SyncPlayFailure.REQUEST)
 			false
+		}
+	}
+
+	/**
+	 * The server keeps a session in its group across socket drops, so a short drop is bridged by joining the same
+	 * group again once the socket is back: the official server then restores the session instead of adding it twice.
+	 */
+	private suspend fun followConnection(generation: Long, groupId: UUID) {
+		while (current(generation)) {
+			transport.connectionState.first { it !is SocketApiState.Connected }
+			Timber.w("SyncPlay: socket lost, waiting up to %d ms to rejoin", RECONNECT_TIMEOUT_MILLIS)
+			val back = withTimeoutOrNull(RECONNECT_TIMEOUT_MILLIS) { transport.connectionState.first { it is SocketApiState.Connected } }
+			if (!current(generation)) return
+			try {
+				if (back == null) error("socket did not come back")
+				withTimeout(REQUEST_TIMEOUT_MILLIS) { transport.joinGroup(groupId) }
+				// Joining marks this session as loading again; say so if the item is already loaded.
+				if (current(generation) && preparedItem != null) report(buffering = false)
+				Timber.i("SyncPlay: rejoined %s after a socket drop", groupId)
+			} catch (error: CancellationException) {
+				throw error
+			} catch (error: Exception) {
+				Timber.w(error, "SyncPlay: could not rejoin after a socket drop")
+				if (current(generation)) failSession(SyncPlayFailure.DISCONNECTED)
+				return
+			}
 		}
 	}
 
@@ -187,12 +238,15 @@ class SyncPlayCoordinator(
 				when (update) {
 					is SyncPlayPlayQueueUpdate -> if (session.updateQueue(generation, update.groupId, update.data)) {
 						publish()
-						reconcilePlayback()
+						// Leaving the player stops following so nobody waits; a new title brings everyone back.
+						if (update.data.reason == PlayQueueUpdateReason.NEW_PLAYLIST && !state.value.following) {
+							scope.launch { resume() }
+						} else reconcilePlayback()
 					}
 					is SyncPlayGroupLeftUpdate, is SyncPlayNotInGroupUpdate -> reset(stopPlayer = false)
 					is SyncPlayGroupDoesNotExistUpdate -> failSession(SyncPlayFailure.GROUP_MISSING)
 					is SyncPlayLibraryAccessDeniedUpdate -> failSession(SyncPlayFailure.ACCESS_DENIED)
-					is SyncPlayStateUpdate -> mutableState.value = state.value.copy(group = state.value.group?.copy(state = update.data.state))
+					is SyncPlayStateUpdate -> if (session.updateGroup(generation, update.groupId) { it.copy(state = update.data.state) }) publish()
 					is SyncPlayUserJoinedUpdate -> {
 						mutableAlerts.tryEmit(SyncPlayAlert.UserJoined(update.data))
 						refreshParticipants(generation)
@@ -210,8 +264,8 @@ class SyncPlayCoordinator(
 	private fun refreshParticipants(generation: Long) {
 		scope.launch {
 			try {
-				val group = transport.groups().firstOrNull { it.groupId == state.value.group?.groupId }
-				if (current(generation) && group != null) mutableState.value = state.value.copy(group = group)
+				val groups = transport.groups()
+				if (current(generation)) updateMembers(groups)
 			} catch (error: CancellationException) { throw error } catch (_: Exception) { /* Retain the last authoritative names. */ }
 		}
 	}
@@ -398,6 +452,22 @@ class SyncPlayCoordinator(
 	private fun failSession(error: SyncPlayFailure) {
 		reset(stopPlayer = true)
 		mutableState.value = state.value.copy(error = error)
+		// The server keeps this session in its group until told otherwise, where the others see it and wait for it.
+		leaveJob = scope.launch { leaveQuietly() }
+	}
+
+	override suspend fun leaveStale() = membershipMutex.withLock {
+		if (state.value.group == null && !state.value.joining) leaveQuietly()
+	}
+
+	private suspend fun leaveQuietly() {
+		try {
+			withTimeout(REQUEST_TIMEOUT_MILLIS) { transport.leaveGroup() }
+		} catch (error: CancellationException) {
+			throw error
+		} catch (error: Exception) {
+			Timber.w(error, "SyncPlay: best-effort leave failed")
+		}
 	}
 
 	private fun cancelPlayback() {
@@ -430,6 +500,8 @@ class SyncPlayCoordinator(
 
 	private companion object {
 		const val REQUEST_TIMEOUT_MILLIS = 10_000L
+		const val RECONNECT_TIMEOUT_MILLIS = 30_000L
+		const val WARM_UP_MILLIS = 60_000L
 		const val ALERT_BUFFER = 8
 		const val PREPARE_TIMEOUT_MILLIS = 30_000L
 		const val BUFFERING_DELAY_MILLIS = 3000L

@@ -139,8 +139,9 @@ class DestinationFragmentView @JvmOverloads constructor(
 			entry.fragment = fragment
 		}
 
-		// Update arguments
-		fragment.arguments = entry.arguments
+		// Update arguments. Android refuses this once an added fragment's state is saved (back pressed as the app goes
+		// to the background); that fragment still holds the arguments it was created with.
+		if (!fragment.isStateSaved) fragment.arguments = entry.arguments
 
 		transaction.apply {
 			// Set options

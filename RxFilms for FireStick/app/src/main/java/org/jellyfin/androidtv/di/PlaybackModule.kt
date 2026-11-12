@@ -94,7 +94,13 @@ fun Scope.createPlaybackManager() = playbackManager(androidContext()) {
 	install(media3SessionPlugin(get(), mediaSessionOptions))
 
 	val deviceProfileBuilder = { createDeviceProfile(androidContext(), userPreferences, get()) }
-	install(jellyfinPlugin(get(), deviceProfileBuilder, setOf(MediaSegmentType.INTRO), ProcessLifecycleOwner.get().lifecycle))
+	// Intros are skipped with OK on the "Skip" prompt (VideoPlayerOverlay), never automatically.
+	install(
+		jellyfinPlugin(
+			get(), deviceProfileBuilder, setOf(MediaSegmentType.INTRO), ProcessLifecycleOwner.get().lifecycle,
+			mediaSegmentAutoSkip = false,
+		)
+	)
 
 	// Options
 	val userSettingPreferences = get<UserSettingPreferences>()

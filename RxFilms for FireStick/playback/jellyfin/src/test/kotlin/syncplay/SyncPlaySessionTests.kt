@@ -36,6 +36,18 @@ class SyncPlaySessionTests : FunSpec({
 		session.state.value.queue shouldBe null
 	}
 
+	test("C08 a Stop older than the current queue does not block loading it") {
+		val session = SyncPlaySession()
+		val generation = session.beginJoin(groupId)
+		session.joined(generation, group())
+		session.acceptCommand(generation, command(SendCommandType.STOP, emitted = 1050, position = null)) shouldBe true
+		session.state.value.playbackCommand?.command shouldBe SendCommandType.STOP
+		session.updateQueue(generation, groupId, queue(1100)) shouldBe true
+		session.state.value.playbackCommand shouldBe null
+		session.acceptCommand(generation, command(SendCommandType.STOP, emitted = 1200, position = null)) shouldBe true
+		session.state.value.playbackCommand?.command shouldBe SendCommandType.STOP
+	}
+
 	test("Q02 preserves repeated media as different occurrences") {
 		val session = SyncPlaySession()
 		val generation = session.beginJoin(groupId)

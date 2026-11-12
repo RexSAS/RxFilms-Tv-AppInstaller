@@ -41,6 +41,14 @@ class SyncPlayViewModel(
 	init {
 		viewModelScope.launch {
 			sessionRepository.currentSession.collectLatest { session ->
+				// A crash or kill never told the server we left; the others would keep seeing (and waiting for) us.
+				if (session != null) try {
+					client.leaveStale()
+				} catch (error: CancellationException) {
+					throw error
+				} catch (error: Exception) {
+					Timber.w(error, "SyncPlay: stale cleanup failed")
+				}
 				if (session != activeSession) {
 					activeSession = session
 					operation?.cancel()
@@ -53,6 +61,7 @@ class SyncPlayViewModel(
 
 	fun show() {
 		mutableUiState.value = mutableUiState.value.copy(visible = true)
+		client.warmUp()
 		refresh()
 	}
 
@@ -72,7 +81,12 @@ class SyncPlayViewModel(
 	}
 
 	fun join(groupId: UUID) {
-		launchOperation(SyncPlayUiError.MEMBERSHIP) { client.join(groupId) }
+		launchOperation(SyncPlayUiError.MEMBERSHIP) {
+			client.join(groupId).also { joined ->
+				// The list may be stale (e.g. the group was just removed): show the current groups.
+				if (!joined) runCatching { client.groups() }.onSuccess { mutableUiState.value = mutableUiState.value.copy(groups = it) }
+			}
+		}
 	}
 
 	fun leave() {

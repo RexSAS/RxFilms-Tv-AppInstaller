@@ -11,6 +11,10 @@ import kotlin.time.Duration
 class SyncPlayMediaSessionInterceptor(
 	private val syncPlay: SyncPlayClient,
 	private val scope: CoroutineScope,
+	// Position seeks; the app passes [SyncPlaySeeker] so repeated seeks reach the group once.
+	private val seekTo: suspend (Duration) -> Unit = { position ->
+		syncPlay.request(SyncPlayRequest.Seek(position.inWholeMilliseconds.coerceAtLeast(0) * TICKS_PER_MILLISECOND))
+	},
 ) : PlaybackCommandInterceptor {
 	override fun setPlaying(playing: Boolean) = intercept {
 		if (playing && !syncPlay.state.value.following) syncPlay.resume()
@@ -24,9 +28,7 @@ class SyncPlayMediaSessionInterceptor(
 			it.playlist.getOrNull(it.playingItemIndex)?.playlistItemId
 		}
 		when (command) {
-			PlaybackSeekCommand.POSITION -> syncPlay.request(
-				SyncPlayRequest.Seek(position.inWholeMilliseconds.coerceAtLeast(0) * TICKS_PER_MILLISECOND)
-			)
+			PlaybackSeekCommand.POSITION -> seekTo(position)
 			PlaybackSeekCommand.PREVIOUS -> occurrence?.let { syncPlay.request(SyncPlayRequest.Previous(it)) }
 			PlaybackSeekCommand.NEXT -> occurrence?.let { syncPlay.request(SyncPlayRequest.Next(it)) }
 		}

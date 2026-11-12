@@ -21,6 +21,10 @@ import org.jellyfin.sdk.model.api.SyncPlayPlayQueueUpdate
 import org.jellyfin.sdk.model.api.SyncPlayQueueItem
 import org.jellyfin.sdk.model.api.SyncPlayUserJoinedUpdate
 import org.jellyfin.sdk.model.api.SyncPlayUserLeftUpdate
+import org.jellyfin.sdk.model.api.SyncPlayStateUpdate
+import org.jellyfin.sdk.model.api.GroupStateUpdate
+import org.jellyfin.sdk.model.api.GroupStateType
+import org.jellyfin.sdk.model.api.PlaybackRequestType
 import org.jellyfin.sdk.model.api.UtcTimeResponse
 import java.util.UUID
 
@@ -49,6 +53,113 @@ class SyncPlayCoordinatorTests : FunSpec({
 			create.await() shouldBe false
 			fixture.coordinator.state.value.error shouldBe SyncPlayFailure.NO_CONNECTION
 			fixture.transport.created shouldBe false
+		}
+	}
+
+	test("M05 warm-up subscribes to the socket before any Create/Join") {
+		runTest {
+			val fixture = Fixture(this)
+			fixture.transport.events.subscriptionCount.value shouldBe 0
+			fixture.coordinator.warmUp()
+			runCurrent()
+			fixture.transport.events.subscriptionCount.value shouldBe 1
+			advanceTimeBy(60_001)
+			runCurrent()
+			fixture.transport.events.subscriptionCount.value shouldBe 0
+		}
+	}
+
+	test("L07 a local failure also leaves the group on the server, and stale membership is cleared") {
+		runTest {
+			val fixture = Fixture(this)
+			fixture.join()
+			fixture.transport.connectionState.value = SocketApiState.Disconnected()
+			runCurrent()
+			advanceTimeBy(30_001)
+			runCurrent()
+			fixture.coordinator.state.value.error shouldBe SyncPlayFailure.DISCONNECTED
+			fixture.transport.leaveCount shouldBe 1
+			fixture.coordinator.leaveStale()
+			fixture.transport.leaveCount shouldBe 2
+		}
+	}
+
+	test("L08 stale cleanup never leaves a group this app is in") {
+		runTest {
+			val fixture = Fixture(this)
+			fixture.join()
+			fixture.coordinator.leaveStale()
+			fixture.transport.leaveCount shouldBe 0
+			fixture.coordinator.state.value.group?.groupId shouldBe groupId
+		}
+	}
+
+	test("L06 a short socket drop rejoins the same group and keeps playback") {
+		runTest {
+			val fixture = Fixture(this)
+			fixture.join()
+			fixture.emitQueue()
+			runCurrent()
+			val readyBefore = fixture.transport.requests.filterIsInstance<SyncPlayRequest.Ready>().size
+			fixture.transport.connectionState.value = SocketApiState.Disconnected()
+			runCurrent()
+			advanceTimeBy(5000)
+			fixture.transport.connectionState.value = SocketApiState.Connected
+			runCurrent()
+			fixture.transport.joinCount shouldBe 2
+			fixture.coordinator.state.value.group?.groupId shouldBe groupId
+			fixture.coordinator.state.value.error shouldBe null
+			fixture.transport.requests.filterIsInstance<SyncPlayRequest.Ready>().size shouldBe readyBefore + 1
+		}
+	}
+
+	test("F01 a new title brings a member that left the player back into the group") {
+		runTest {
+			val fixture = Fixture(this)
+			fixture.join()
+			fixture.emitQueue()
+			runCurrent()
+			fixture.coordinator.halt()
+			runCurrent()
+			fixture.coordinator.state.value.following shouldBe false
+			fixture.transport.events.emit(SyncPlayEvent.GroupUpdate(SyncPlayPlayQueueUpdate(groupId, queue(updated = 1500, index = 1))))
+			runCurrent()
+			fixture.coordinator.state.value.following shouldBe true
+			fixture.transport.requests.filterIsInstance<SyncPlayRequest.IgnoreWait>().map { it.ignore } shouldBe listOf(true, false)
+			fixture.player.prepared.last() shouldBe queue().playlist[1].playlistItemId
+		}
+	}
+
+	test("G01 members and group state survive later playback updates") {
+		runTest {
+			val fixture = Fixture(this)
+			fixture.join()
+			fixture.transport.listedGroups = listOf(group().copy(participants = listOf("Alex", "Sam"), lastUpdatedAt = date(9000)))
+			fixture.transport.events.emit(SyncPlayEvent.GroupUpdate(SyncPlayUserJoinedUpdate(groupId, "Sam")))
+			runCurrent()
+			fixture.transport.events.emit(
+				SyncPlayEvent.GroupUpdate(SyncPlayStateUpdate(groupId, GroupStateUpdate(GroupStateType.PLAYING, PlaybackRequestType.UNPAUSE)))
+			)
+			fixture.emitQueue()
+			runCurrent()
+			val group = requireNotNull(fixture.coordinator.state.value.group)
+			group.participants shouldBe listOf("Alex", "Sam")
+			group.state shouldBe GroupStateType.PLAYING
+			// Commands are still filtered against the join time, not the listing's.
+			group.lastUpdatedAt shouldBe group().lastUpdatedAt
+		}
+	}
+
+	test("C08 the Stop sent on join does not block a queue set afterwards") {
+		runTest {
+			val fixture = Fixture(this)
+			fixture.join()
+			fixture.transport.events.emit(SyncPlayEvent.Command(command(SendCommandType.STOP, emitted = 1050, position = null)))
+			runCurrent()
+			fixture.emitQueue()
+			runCurrent()
+			fixture.player.prepared shouldBe listOf(occurrenceId)
+			fixture.transport.requests.filterIsInstance<SyncPlayRequest.Ready>().size shouldBe 1
 		}
 	}
 
@@ -203,7 +314,7 @@ class SyncPlayCoordinatorTests : FunSpec({
 			runCurrent()
 			fixture.transport.connectionState.value = SocketApiState.Disconnected()
 			runCurrent()
-			advanceTimeBy(3000)
+			advanceTimeBy(30_001) // reconnect window
 			runCurrent()
 			fixture.player.playing shouldBe false
 			fixture.coordinator.state.value.error shouldBe SyncPlayFailure.DISCONNECTED
@@ -294,7 +405,9 @@ private class FakeSyncPlayTransport : SyncPlayTransport {
 	var joinedWithSubscriber = false
 	var failJoin = false
 	var joinCount = 0
-	override suspend fun groups() = listOf(group())
+	var leaveCount = 0
+	var listedGroups = listOf(group())
+	override suspend fun groups() = listedGroups
 	var created = false
 	override suspend fun createGroup(name: String): GroupInfoDto = group().also { created = true }
 	override suspend fun joinGroup(id: UUID) {
@@ -303,6 +416,7 @@ private class FakeSyncPlayTransport : SyncPlayTransport {
 		check(!failJoin)
 	}
 	override suspend fun leaveGroup() {
+		leaveCount++
 		events.emit(SyncPlayEvent.GroupUpdate(SyncPlayGroupLeftUpdate(groupId, groupId.toString())))
 	}
 	override suspend fun time() = UtcTimeResponse(date(1000), date(1000))

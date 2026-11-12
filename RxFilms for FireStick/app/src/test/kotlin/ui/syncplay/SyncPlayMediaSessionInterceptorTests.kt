@@ -5,6 +5,7 @@ import io.kotest.matchers.types.shouldBeInstanceOf
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.jellyfin.playback.core.PlaybackSeekCommand
@@ -22,6 +23,39 @@ import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SyncPlayMediaSessionInterceptorTests : FunSpec({
+	test("repeated group seeks move the TV each time but reach the group once") {
+		runTest {
+			val client = InterceptorClient(joined = true)
+			val local = mutableListOf<kotlin.time.Duration>()
+			val seeker = SyncPlaySeeker(client, { local += it }, this)
+
+			seeker.seek(40.seconds)
+			advanceTimeBy(100)
+			seeker.seek(30.seconds)
+			advanceTimeBy(100)
+			seeker.seek((-5).seconds)
+			advanceTimeBy(400)
+			client.requests.size shouldBe 0
+			advanceUntilIdle()
+
+			local shouldBe listOf(40.seconds, 30.seconds, 0.seconds)
+			client.requests shouldBe listOf(SyncPlayRequest.Seek(0L))
+		}
+	}
+
+	test("intro skips and remote seeks use the group seeker while joined") {
+		runTest {
+			val client = InterceptorClient(joined = true)
+			val seeks = mutableListOf<kotlin.time.Duration>()
+			val interceptor = SyncPlayMediaSessionInterceptor(client, this) { seeks += it }
+
+			interceptor.seek(85.seconds, PlaybackSeekCommand.POSITION) shouldBe true
+			advanceUntilIdle()
+			seeks shouldBe listOf(85.seconds)
+			client.requests.size shouldBe 0
+		}
+	}
+
 	test("solo media session commands are not intercepted") {
 		runTest {
 			val client = InterceptorClient(joined = false)

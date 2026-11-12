@@ -13,6 +13,7 @@ import org.jellyfin.sdk.api.client.extensions.videosApi
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.DeviceProfile
 import org.jellyfin.sdk.model.api.MediaProtocol
+import org.jellyfin.sdk.model.api.MediaStreamType
 import org.jellyfin.sdk.model.api.MediaType
 import org.jellyfin.sdk.model.api.PlaybackInfoDto
 
@@ -22,6 +23,7 @@ class JellyfinMediaStreamResolver(
 ) : MediaStreamResolver {
 	companion object {
 		private val supportedMediaTypes = arrayOf(MediaType.VIDEO, MediaType.AUDIO)
+		private const val ITALIAN = "ita"
 	}
 
 	override suspend fun getStream(queueEntry: QueueEntry): PlayableMediaStream? {
@@ -83,6 +85,14 @@ class JellyfinMediaStreamResolver(
 		mediaSourceId: String? = null,
 	): MediaInfo {
 		val profile = deviceProfileBuilder()
+		val streams = (item.mediaSources?.firstOrNull { it.id == mediaSourceId } ?: item.mediaSources?.firstOrNull())
+			?.mediaStreams.orEmpty()
+		// When the server converts the stream it picks the tracks: same defaults as the player (Italian audio, forced
+		// Italian subtitles burned in, else none). Direct play ignores these and lets the player choose.
+		val italianAudio = streams.firstOrNull { it.type == MediaStreamType.AUDIO && it.language == ITALIAN }?.index
+		val forcedItalianSubtitle = streams.firstOrNull {
+			it.type == MediaStreamType.SUBTITLE && it.isForced && it.language == ITALIAN
+		}?.index
 		val response by api.mediaInfoApi.getPostedPlaybackInfo(
 			itemId = item.id,
 			data = PlaybackInfoDto(
@@ -94,6 +104,9 @@ class JellyfinMediaStreamResolver(
 				allowVideoStreamCopy = true,
 				allowAudioStreamCopy = true,
 				autoOpenLiveStream = false,
+				audioStreamIndex = italianAudio,
+				subtitleStreamIndex = if (streams.isEmpty()) null else forcedItalianSubtitle ?: -1,
+				alwaysBurnInSubtitleWhenTranscoding = forcedItalianSubtitle != null,
 			)
 		)
 

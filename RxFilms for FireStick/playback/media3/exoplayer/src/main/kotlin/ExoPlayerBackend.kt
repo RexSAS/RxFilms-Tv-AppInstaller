@@ -135,6 +135,10 @@ class ExoPlayerBackend(
 						}.build()
 					)
 					setAllowInvalidateSelectionsOnRendererCapabilitiesChange(true)
+					// RxFilms defaults: Italian audio; subtitles only when forced (in the audio's language, so forced
+					// Italian), never just because a track is flagged default. Track menu choices still override.
+					setPreferredAudioLanguage("it")
+					setIgnoredTextSelectionFlags(C.SELECTION_FLAG_DEFAULT)
 				})
 			})
 			.setMediaSourceFactory(mediaSourceFactory)

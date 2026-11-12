@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import org.jellyfin.playback.core.PlaybackSeekCommand
 import org.jellyfin.playback.core.plugin.PlayerService
 import org.jellyfin.playback.core.queue.QueueEntry
 import org.jellyfin.playback.core.queue.queue
@@ -21,6 +22,7 @@ import org.jellyfin.sdk.model.extensions.ticks
 class MediaSegmentService(
 	private val api: ApiClient,
 	private val skipTypes: Set<MediaSegmentType>,
+	private val autoSkip: Boolean = true,
 ) : PlayerService() {
 	companion object {
 		const val TIMED_EVENT_PREFIX = "MediaSegment:"
@@ -68,7 +70,7 @@ class MediaSegmentService(
 	}
 
 	private fun MediaSegmentDto.asTimedEvents(): List<TimedEvent> {
-		if (!skipTypes.contains(type)) return emptyList()
+		if (!autoSkip || !skipTypes.contains(type)) return emptyList()
 
 		return listOf(
 			TimedEvent.Block(
@@ -79,7 +81,10 @@ class MediaSegmentService(
 					if (metadata !is BlockActivation.Natural) return@Block
 
 					coroutineScope.launch(Dispatchers.Main) {
-						manager.state.seek(endTicks.ticks)
+						// In a SyncPlay group the skip must move everyone, not only this player.
+						if (manager.commandInterceptor?.seek(endTicks.ticks, PlaybackSeekCommand.POSITION) != true) {
+							manager.state.seek(endTicks.ticks)
+						}
 					}
 				}
 			)

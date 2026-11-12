@@ -17,6 +17,10 @@ interface SyncPlayClient {
 	val state: StateFlow<SyncPlayStatus>
 	val alerts: Flow<SyncPlayAlert> get() = emptyFlow()
 
+	/** Opens the server socket ahead of a likely Create/Join (e.g. the SyncPlay dialog opened). */
+	fun warmUp() = Unit
+	/** Leaves any group the server still lists for this session while this app is in none (e.g. after a crash). */
+	suspend fun leaveStale() = Unit
 	suspend fun groups(): List<GroupInfoDto>
 	suspend fun create(name: String): Boolean
 	suspend fun join(id: UUID): Boolean
