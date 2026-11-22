@@ -253,14 +253,17 @@ public class VideoManager {
         DefaultLoadControl loadControl;
         if (bufferLength == BufferLength.LARGE) {
             loadControl = new DefaultLoadControl.Builder()
-                    .setBufferDurationsMs(50_000, 120_000, 2_500, 5_000)
+                    .setBufferDurationsMs(50_000, 120_000, 10_000, 10_000)
                     .build();
         } else if (bufferLength == BufferLength.EXTRA_LARGE) {
             loadControl = new DefaultLoadControl.Builder()
-                    .setBufferDurationsMs(80_000, 240_000, 5_000, 10_000)
+                    .setBufferDurationsMs(80_000, 240_000, 10_000, 10_000)
                     .build();
         } else {
-            loadControl = new DefaultLoadControl();
+            // ExoPlayer's default starts with 2.5 s buffered, which runs dry a couple of seconds in over a slow link.
+            loadControl = new DefaultLoadControl.Builder()
+                    .setBufferDurationsMs(50_000, 50_000, 10_000, 10_000)
+                    .build();
         }
         exoPlayerBuilder.setLoadControl(loadControl);
 

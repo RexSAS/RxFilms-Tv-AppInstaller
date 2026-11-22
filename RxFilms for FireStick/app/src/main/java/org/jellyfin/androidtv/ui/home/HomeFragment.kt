@@ -50,6 +50,9 @@ import org.koin.android.ext.android.inject
  */
 var showHomeSplash by mutableStateOf(true)
 
+/** Times MainActivity's start checker reloaded the start because the home didn't load; reset once it does. */
+var homeStartReloads = 0
+
 class HomeFragment : Fragment() {
 	private val sessionRepository by inject<SessionRepository>()
 	private val serverRepository by inject<ServerRepository>()
@@ -74,10 +77,12 @@ class HomeFragment : Fragment() {
 		// Loading screen on app start, so the home doesn't show bare titles while rows and posters download.
 		var rowsAdded by remember { mutableStateOf(false) }
 		LaunchedEffect(rowsAdded) {
-			if (!showHomeSplash) return@LaunchedEffect
-			// Once the rows and the media bar picture are in, give the posters a moment; never wait forever.
-			delay(if (rowsAdded) 0.7.seconds else 10.seconds)
+			// Once the rows and the media bar picture are in, give the posters a moment. A home that never loads is
+			// MainActivity's start checker's job, so the splash never uncovers an empty grey screen.
+			if (!showHomeSplash || !rowsAdded) return@LaunchedEffect
+			delay(0.7.seconds)
 			showHomeSplash = false
+			homeStartReloads = 0
 		}
 
 		// The rows fill the whole screen so the media bar can sit behind the toolbar; the toolbar gets a shadow to stay readable.

@@ -15,6 +15,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterNotNull
@@ -110,7 +111,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				.addClassPresenter(MediaBarRow::class.java, HomeFragmentMediaBarRow.rowPresenter)
 		)
 
-		lifecycleScope.launch(Dispatchers.IO) {
+		lifecycleScope.launch(Dispatchers.IO + CoroutineExceptionHandler { _, e -> Timber.e(e, "Home rows failed to load") }) {
 			val currentUser = withTimeout(30.seconds) {
 				userRepository.currentUser.filterNotNull().first()
 			}

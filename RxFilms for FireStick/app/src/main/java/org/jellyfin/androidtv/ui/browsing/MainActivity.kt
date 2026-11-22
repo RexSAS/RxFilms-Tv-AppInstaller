@@ -9,6 +9,7 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.delay
+import org.jellyfin.androidtv.ui.home.homeStartReloads
 import org.jellyfin.androidtv.ui.home.showHomeSplash
 import org.jellyfin.androidtv.ui.startup.fragment.RxFilmsSplash
 import kotlin.time.Duration.Companion.seconds
@@ -92,11 +93,12 @@ class MainActivity : FragmentActivity() {
 					AnimatedVisibility(visible = showHomeSplash, enter = EnterTransition.None, exit = fadeOut()) {
 						RxFilmsSplash()
 					}
-					// Safety net: never leave the splash up if the home doesn't report back.
+					// Start checker: the home didn't load its rows in time (server/tunnel not ready, a failed request).
+					// Reload the whole start instead of uncovering a grey screen; after two tries show what there is.
 					LaunchedEffect(showHomeSplash) {
 						if (showHomeSplash) {
 							delay(12.seconds)
-							showHomeSplash = false
+							if (homeStartReloads++ < 2) reloadStart() else showHomeSplash = false
 						}
 					}
 				}
@@ -114,6 +116,14 @@ class MainActivity : FragmentActivity() {
 		applyTheme()
 
 		interactionTrackerViewModel.activityPaused = false
+	}
+
+	private fun reloadStart() {
+		Timber.w("Home didn't load, reloading the start (attempt $homeStartReloads)")
+		startActivity(Intent(this, StartupActivity::class.java))
+		@Suppress("DEPRECATION")
+		overridePendingTransition(0, 0)
+		finish()
 	}
 
 	private fun validateAuthentication(): Boolean {
