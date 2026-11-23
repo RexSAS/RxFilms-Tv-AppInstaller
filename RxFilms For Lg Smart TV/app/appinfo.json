@@ -1,6 +1,6 @@
 {
 	"id": "org.rxfilms.tv",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"vendor": "RxFilms",
 	"type": "web",
 	"main": "index.html",

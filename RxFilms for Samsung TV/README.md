@@ -30,7 +30,7 @@ signed once on your machine:
    the TV (name it e.g. `rxfilms`; it reads the TV's DUID over `sdb`).
 4. Sign and install the release (or your own build):
    ```sh
-   mkdir wgt && cd wgt && unzip ../RxFilms-1.0.0.wgt
+   mkdir wgt && cd wgt && unzip ../RxFilms-1.0.1.wgt
    tizen package -t wgt -s rxfilms -- .
    tizen install -n RxFilms.wgt -t "$(sdb devices | sed -n 2p | awk '{print $3}')"
    ```

@@ -6,6 +6,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationAction
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
@@ -25,7 +26,9 @@ import org.jellyfin.sdk.api.client.extensions.userLibraryApi
 import org.jellyfin.sdk.model.api.SyncPlayQueueItem
 import java.util.UUID
 import kotlin.math.abs
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 /** Bridges SyncPlay to the shared Media3 player used by the rewrite video screen. */
 class CoreSyncPlayPlayer(
@@ -91,6 +94,15 @@ class CoreSyncPlayPlayer(
 		ready.await()
 		playbackManager.state.pause()
 		seek(positionTicks)
+		// The group starts once every member reports ready (after prepare): first load 10 s here, capped so a slow TV can't hold everyone forever.
+		withTimeoutOrNull(START_BUFFER_WAIT) {
+			while (true) {
+				val position = playbackManager.state.positionInfo
+				if (position.buffer - position.active >= START_BUFFER) break
+				if (position.duration > Duration.ZERO && position.buffer >= position.duration) break
+				delay(SEEK_POLL_MILLIS)
+			}
+		}
 		preparingItem = null
 	}
 
@@ -119,5 +131,7 @@ class CoreSyncPlayPlayer(
 		const val SEEK_ATTEMPTS = 20
 		const val SEEK_POLL_MILLIS = 50L
 		const val SEEK_TOLERANCE_MILLIS = 250L
+		val START_BUFFER = 10.seconds
+		val START_BUFFER_WAIT = 15.seconds
 	}
 }

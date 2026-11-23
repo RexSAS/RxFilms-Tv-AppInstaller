@@ -29,6 +29,8 @@ var VIDEO_FITS = [
 function PlayerScreen(item, startSeconds, sync) {
 	var SEEK_BACK = 10;
 	var SEEK_FORWARD = 30;
+	var START_BUFFER = 10; // seconds loaded before a SyncPlay title start says Ready
+	var START_BUFFER_WAIT = 15000;
 	var el = h('div', 'screen player');
 	var video = h('video');
 	video.autoplay = !sync;
@@ -99,6 +101,7 @@ function PlayerScreen(item, startSeconds, sync) {
 			state.session = info.PlaySessionId;
 			state.method = stream.method;
 			state.syncWaiting = !!sync;
+			state.syncStartBy = Date.now() + START_BUFFER_WAIT;
 			pendingSeek = start;
 			video.src = stream.url;
 			setSubtitles();
@@ -239,9 +242,25 @@ function PlayerScreen(item, startSeconds, sync) {
 		showOsd();
 	}
 
+	/** Seconds loaded ahead of the current position. */
+	function bufferedAhead() {
+		for (var i = 0; i < video.buffered.length; i++) {
+			if (video.buffered.start(i) <= video.currentTime + 0.5 && video.currentTime <= video.buffered.end(i)) return video.buffered.end(i) - video.currentTime;
+		}
+		return 0;
+	}
+
 	/** Tells the group this TV has the frame at the current position and can go. */
 	function syncReady() {
 		if (!state.syncWaiting || !inGroup()) return;
+		// Title start: hold Ready until 10 s are loaded here, capped so a slow TV can't hold the group forever.
+		clearTimeout(timers.startBuffer);
+		var left = (video.duration || Infinity) - video.currentTime;
+		if (Date.now() < state.syncStartBy && bufferedAhead() < Math.min(START_BUFFER, left - 0.5)) {
+			timers.startBuffer = setTimeout(syncReady, 250);
+			return;
+		}
+		state.syncStartBy = 0;
 		state.syncWaiting = false;
 		SyncPlay.report('Ready', video.currentTime, !video.paused);
 		// The server holds everyone until every member has loaded; say so instead of looking stuck on "Loading…".
